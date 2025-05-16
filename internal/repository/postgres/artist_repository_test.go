@@ -34,8 +34,7 @@ func TestArtistRepo_Create_NameTooLong(t *testing.T) {
 	testutils.CleanTables(t, testutils.TestDB)
 	repo := NewArtistRepo(testutils.TestDB)
 
-	// Создаем слишком длинное имя (>100 символов)
-	longName := "A" + strings.Repeat("verylongartistname", 10) // получится 161 символ
+	longName := "A" + strings.Repeat("verylongartistname", 10)
 
 	a := &artist.Artist{Name: longName}
 
