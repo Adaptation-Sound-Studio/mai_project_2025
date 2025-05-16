@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"upload-service/internal/domain"
 )
 
@@ -31,11 +32,14 @@ func (r *artistRepository) GetAllArtists(ctx context.Context) ([]domain.Artist, 
 	var artists []domain.Artist
 	for rows.Next() {
 		var a domain.Artist
-		err = rows.Scan(&a.ArtistID, &a.Name)
-		if err != nil {
+		if err := rows.Scan(&a.ArtistID, &a.Name); err != nil {
 			return nil, err
 		}
 		artists = append(artists, a)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return artists, nil
@@ -45,6 +49,9 @@ func (r *artistRepository) GetArtistByID(ctx context.Context, id int64) (*domain
 	row := r.db.QueryRowContext(ctx, "SELECT artist_id, name FROM artists WHERE artist_id = $1", id)
 	var a domain.Artist
 	err := row.Scan(&a.ArtistID, &a.Name)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -60,9 +67,21 @@ func (r *artistRepository) CreateArtist(ctx context.Context, artist *domain.Arti
 }
 
 func (r *artistRepository) UpdateArtist(ctx context.Context, artist *domain.Artist) error {
-	_, err := r.db.ExecContext(ctx,
+	res, err := r.db.ExecContext(ctx,
 		"UPDATE artists SET name = $1 WHERE artist_id = $2",
 		artist.Name, artist.ArtistID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("артист с ID %d не найден", artist.ArtistID)
+	}
+
+	return nil
 }
