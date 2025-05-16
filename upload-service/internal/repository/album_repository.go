@@ -4,13 +4,19 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"upload-service/internal/domain"
+
+	"github.com/lib/pq"
 )
 
 type AlbumRepository interface {
 	GetAllAlbums(ctx context.Context) ([]domain.Album, error)
 	GetAlbumByID(ctx context.Context, id int64) (*domain.Album, error)
-	CreateAlbum(ctx context.Context, album *domain.Album) error
+	CheckSongsExist(ctx context.Context, tx *sql.Tx, songIDs []int64) ([]int64, error)
+	BatchInsertSongsToAlbum(ctx context.Context, tx *sql.Tx, albumID int64, songIDs []int64) error
+	GetSongsByAlbumID(ctx context.Context, albumID int64) ([]domain.Song, error)
+	CreateAlbum(ctx context.Context, tx *sql.Tx, album *domain.Album) (int64, error)
 	UpdateAlbum(ctx context.Context, album *domain.Album) error
 }
 
@@ -58,18 +64,22 @@ func (r *albumRepository) GetAlbumByID(ctx context.Context, id int64) (*domain.A
 	return &a, nil
 }
 
-func (r *albumRepository) CreateAlbum(ctx context.Context, album *domain.Album) error {
-	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO albums (name, auditions, artist_id, genre_id, date) VALUES ($1, $2, $3, $4, $5)",
-		album.Name, album.Auditions, album.ArtistID, album.GenreID, album.Date,
-	)
-	return err
+func (r *albumRepository) CreateAlbum(ctx context.Context, tx *sql.Tx, album *domain.Album) (int64, error) {
+	var albumID int64
+	err := tx.QueryRowContext(ctx,
+		"INSERT INTO albums (name, artist_id, genre_id) VALUES ($1, $2, $3) RETURNING album_id",
+		album.Name, album.ArtistID, album.GenreID,
+	).Scan(&albumID)
+	if err != nil {
+		return 0, err
+	}
+	return albumID, nil
 }
 
 func (r *albumRepository) UpdateAlbum(ctx context.Context, album *domain.Album) error {
 	res, err := r.db.ExecContext(ctx,
-		"UPDATE albums SET name = $1, auditions = $2, artist_id = $3, genre_id = $4, date = $5 WHERE album_id = $6",
-		album.Name, album.Auditions, album.ArtistID, album.GenreID, album.Date, album.AlbumID,
+		"UPDATE albums SET name = $1, genre_id = $2 WHERE album_id = $3",
+		album.Name, album.GenreID, album.AlbumID,
 	)
 	if err != nil {
 		return err
@@ -84,4 +94,71 @@ func (r *albumRepository) UpdateAlbum(ctx context.Context, album *domain.Album) 
 	}
 
 	return nil
+}
+
+func (r *albumRepository) GetSongsByAlbumID(ctx context.Context, albumID int64) ([]domain.Song, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT s.song_id, s.name, s.auditions, s.genre_id, s.date, s.link
+		 FROM songs s
+		 JOIN song_album sa ON s.song_id = sa.song_id
+		 WHERE sa.album_id = $1`, albumID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var songs []domain.Song
+	for rows.Next() {
+		var s domain.Song
+		if err := rows.Scan(&s.SongID, &s.Name, &s.Auditions, &s.GenreID, &s.Date, &s.Link); err != nil {
+			return nil, err
+		}
+		songs = append(songs, s)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return songs, nil
+}
+
+func (r *albumRepository) CheckSongsExist(ctx context.Context, tx *sql.Tx, songIDs []int64) ([]int64, error) {
+	query := "SELECT song_id FROM songs WHERE song_id = ANY($1)"
+	rows, err := tx.QueryContext(ctx, query, pq.Array(songIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var existingIDs []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		existingIDs = append(existingIDs, id)
+	}
+	return existingIDs, rows.Err()
+}
+
+func (r *albumRepository) BatchInsertSongsToAlbum(ctx context.Context, tx *sql.Tx, albumID int64, songIDs []int64) error {
+	if len(songIDs) == 0 {
+		return nil
+	}
+
+	if len(songIDs) > 50 {
+		return fmt.Errorf("нельзя добавить более 50 песен в альбом")
+	}
+
+	var placeholders []string
+	var args []interface{}
+	for i, songID := range songIDs {
+		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d)", i*2+1, i*2+2))
+		args = append(args, songID, albumID)
+	}
+
+	query := fmt.Sprintf("INSERT INTO song_album (song_id, album_id) VALUES %s", strings.Join(placeholders, ", "))
+	_, err := tx.ExecContext(ctx, query, args...)
+	return err
 }

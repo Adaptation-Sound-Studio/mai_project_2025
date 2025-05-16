@@ -10,8 +10,11 @@ import (
 type SongRepository interface {
 	GetAllSongs(ctx context.Context) ([]domain.Song, error)
 	GetSongByID(ctx context.Context, id int64) (*domain.Song, error)
-	CreateSong(ctx context.Context, song *domain.Song) error
+	CreateSongWithArtists(ctx context.Context, song *domain.Song, artistIDs []int64) (int64, error)
 	UpdateSong(ctx context.Context, song *domain.Song) error
+	CheckArtistsExist(ctx context.Context, artistIDs []int64) ([]int64, error)
+	GetArtistsBySongID(ctx context.Context, songID int64) ([]domain.Artist, error)
+	GetAlbumBySongID(ctx context.Context, songID int64) (*domain.Album, error)
 }
 
 type songRepository struct {
@@ -23,7 +26,7 @@ func NewSongRepository(db *sql.DB) SongRepository {
 }
 
 func (r *songRepository) GetAllSongs(ctx context.Context) ([]domain.Song, error) {
-	rows, err := r.db.QueryContext(ctx, "SELECT song_id, name, auditions, genre_id, date, link FROM songs")
+	rows, err := r.db.QueryContext(ctx, "SELECT song_id, name, auditions, genre_id, date, link FROM songs ORDER BY date DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -58,18 +61,54 @@ func (r *songRepository) GetSongByID(ctx context.Context, id int64) (*domain.Son
 	return &s, nil
 }
 
-func (r *songRepository) CreateSong(ctx context.Context, song *domain.Song) error {
-	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO songs (name, auditions, genre_id, date, link) VALUES ($1, $2, $3, $4, $5)",
-		song.Name, song.Auditions, song.GenreID, song.Date, song.Link,
-	)
-	return err
+func (r *songRepository) CreateSongWithArtists(ctx context.Context, song *domain.Song, artistIDs []int64) (int64, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	var songID int64
+	err = tx.QueryRowContext(ctx,
+		"INSERT INTO songs (name, genre_id, link) VALUES ($1, $2, $3) RETURNING song_id",
+		song.Name, song.GenreID, song.Link,
+	).Scan(&songID)
+	if err != nil {
+		tx.Rollback()
+		return 0, err
+	}
+
+	if len(artistIDs) > 0 {
+		query := "INSERT INTO song_artist (song_id, artist_id) VALUES "
+		args := []interface{}{}
+		argPos := 1
+
+		for i, artistID := range artistIDs {
+			if i > 0 {
+				query += ", "
+			}
+			query += fmt.Sprintf("($%d, $%d)", argPos, argPos+1)
+			args = append(args, songID, artistID)
+			argPos += 2
+		}
+
+		_, err = tx.ExecContext(ctx, query, args...)
+		if err != nil {
+			tx.Rollback()
+			return 0, err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+
+	return songID, nil
 }
 
 func (r *songRepository) UpdateSong(ctx context.Context, song *domain.Song) error {
 	res, err := r.db.ExecContext(ctx,
-		"UPDATE songs SET name = $1, auditions = $2, genre_id = $3, date = $4, link = $5 WHERE song_id = $6",
-		song.Name, song.Auditions, song.GenreID, song.Date, song.Link, song.SongID,
+		"UPDATE songs SET name = $1, genre_id = $2, link = $3 WHERE song_id = $4",
+		song.Name, song.GenreID, song.Link, song.SongID,
 	)
 	if err != nil {
 		return err
@@ -84,4 +123,65 @@ func (r *songRepository) UpdateSong(ctx context.Context, song *domain.Song) erro
 	}
 
 	return nil
+}
+
+func (r *songRepository) CheckArtistsExist(ctx context.Context, artistIDs []int64) ([]int64, error) {
+	query := "SELECT artist_id FROM artists WHERE artist_id = ANY($1)"
+	rows, err := r.db.QueryContext(ctx, query, artistIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var existing []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		existing = append(existing, id)
+	}
+
+	return existing, nil
+}
+
+func (r *songRepository) GetArtistsBySongID(ctx context.Context, songID int64) ([]domain.Artist, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT a.artist_id, a.name, a.user_id 
+		 FROM artists a
+		 JOIN song_artist sa ON a.artist_id = sa.artist_id
+		 WHERE sa.song_id = $1`, songID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var artists []domain.Artist
+	for rows.Next() {
+		var a domain.Artist
+		if err := rows.Scan(&a.ArtistID, &a.Name, &a.UserID); err != nil {
+			return nil, err
+		}
+		artists = append(artists, a)
+	}
+
+	return artists, nil
+}
+
+func (r *songRepository) GetAlbumBySongID(ctx context.Context, songID int64) (*domain.Album, error) {
+	row := r.db.QueryRowContext(ctx,
+		`SELECT al.album_id, al.name, al.auditions, al.artist_id, al.genre_id, al.date
+		 FROM albums al
+		 JOIN song_album sa ON al.album_id = sa.album_id
+		 WHERE sa.song_id = $1`, songID)
+
+	var a domain.Album
+	err := row.Scan(&a.AlbumID, &a.Name, &a.Auditions, &a.ArtistID, &a.GenreID, &a.Date)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &a, nil
 }

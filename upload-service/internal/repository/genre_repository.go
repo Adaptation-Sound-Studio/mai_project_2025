@@ -9,7 +9,7 @@ import (
 
 type GenreRepository interface {
 	GetAllGenres(ctx context.Context) ([]domain.Genre, error)
-	CreateGenre(ctx context.Context, genre *domain.Genre) error
+	CreateGenre(ctx context.Context, genre *domain.Genre) (int64, error)
 	UpdateGenre(ctx context.Context, genre *domain.Genre) error
 }
 
@@ -44,12 +44,16 @@ func (r *genreRepository) GetAllGenres(ctx context.Context) ([]domain.Genre, err
 	return genres, nil
 }
 
-func (r *genreRepository) CreateGenre(ctx context.Context, genre *domain.Genre) error {
-	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO genres (name) VALUES ($1)",
+func (r *genreRepository) CreateGenre(ctx context.Context, genre *domain.Genre) (int64, error) {
+	var genreID int64
+	err := r.db.QueryRowContext(ctx,
+		"INSERT INTO genres (name) VALUES ($1) RETURNING genre_id",
 		genre.Name,
-	)
-	return err
+	).Scan(&genreID)
+	if err != nil {
+		return 0, err
+	}
+	return genreID, nil
 }
 
 func (r *genreRepository) UpdateGenre(ctx context.Context, genre *domain.Genre) error {
