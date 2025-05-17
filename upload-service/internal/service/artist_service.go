@@ -5,29 +5,21 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"upload-service/internal/domain"
+	"upload-service/internal/domain/artist"
 	"upload-service/internal/domain/response"
-	"upload-service/internal/repository"
 )
 
 var ErrArtistNotFound = errors.New("артист не найден")
 
-type ArtistService interface {
-	GetAllArtists(ctx context.Context) ([]domain.Artist, error)
-	GetArtistByID(ctx context.Context, id int64) (*response.ArtistResponse, error)
-	RegisterArtist(ctx context.Context, artist *domain.Artist, userID int64) (int64, error)
-	UpdateArtist(ctx context.Context, artist *domain.Artist) error
-}
-
 type artistService struct {
-	repo repository.ArtistRepository
+	repo artist.Repository
 }
 
-func NewArtistService(r repository.ArtistRepository) ArtistService {
+func NewArtistService(r artist.Repository) *artistService {
 	return &artistService{repo: r}
 }
 
-func (s *artistService) GetAllArtists(ctx context.Context) ([]domain.Artist, error) {
+func (s *artistService) GetAllArtists(ctx context.Context) ([]artist.Artist, error) {
 	artists, err := s.repo.GetAllArtists(ctx)
 	if err != nil {
 		log.Printf("Ошибка при получении всех артистов: %v", err)
@@ -66,7 +58,7 @@ func (s *artistService) GetArtistByID(ctx context.Context, id int64) (*response.
 	return &res, nil
 }
 
-func (s *artistService) RegisterArtist(ctx context.Context, artist *domain.Artist, userID int64) (int64, error) {
+func (s *artistService) RegisterArtist(ctx context.Context, artist *artist.Artist, userID int64) (int64, error) {
 	if artist.Name == "" {
 		return 0, errors.New("имя артиста не может быть пустым")
 	}
@@ -90,7 +82,7 @@ func (s *artistService) RegisterArtist(ctx context.Context, artist *domain.Artis
 	return artistID, nil
 }
 
-func (s *artistService) UpdateArtist(ctx context.Context, artist *domain.Artist) error {
+func (s *artistService) UpdateArtist(ctx context.Context, artist *artist.Artist) error {
 	if artist.ArtistID <= 0 {
 		return errors.New("некорректный ID артиста для обновления")
 	}

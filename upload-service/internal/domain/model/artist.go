@@ -1,4 +1,4 @@
-package domain
+package artist
 
 type Artist struct {
 	ArtistID int64  `json:"artist_id"`

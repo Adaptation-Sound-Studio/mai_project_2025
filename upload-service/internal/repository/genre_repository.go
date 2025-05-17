@@ -4,33 +4,28 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"upload-service/internal/domain"
+	"upload-service/internal/domain/genre"
+	"upload-service/internal/domain/model"
 )
-
-type GenreRepository interface {
-	GetAllGenres(ctx context.Context) ([]domain.Genre, error)
-	CreateGenre(ctx context.Context, genre *domain.Genre) (int64, error)
-	UpdateGenre(ctx context.Context, genre *domain.Genre) error
-}
 
 type genreRepository struct {
 	db *sql.DB
 }
 
-func NewGenreRepository(db *sql.DB) GenreRepository {
+func NewGenreRepository(db *sql.DB) genre.Repository {
 	return &genreRepository{db: db}
 }
 
-func (r *genreRepository) GetAllGenres(ctx context.Context) ([]domain.Genre, error) {
+func (r *genreRepository) GetAllGenres(ctx context.Context) ([]model.Genre, error) {
 	rows, err := r.db.QueryContext(ctx, "SELECT genre_id, name FROM genres")
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var genres []domain.Genre
+	var genres []model.Genre
 	for rows.Next() {
-		var g domain.Genre
+		var g model.Genre
 		if err := rows.Scan(&g.GenreID, &g.Name); err != nil {
 			return nil, err
 		}
@@ -44,7 +39,7 @@ func (r *genreRepository) GetAllGenres(ctx context.Context) ([]domain.Genre, err
 	return genres, nil
 }
 
-func (r *genreRepository) CreateGenre(ctx context.Context, genre *domain.Genre) (int64, error) {
+func (r *genreRepository) CreateGenre(ctx context.Context, genre *model.Genre) (int64, error) {
 	var genreID int64
 	err := r.db.QueryRowContext(ctx,
 		"INSERT INTO genres (name) VALUES ($1) RETURNING genre_id",
@@ -56,7 +51,7 @@ func (r *genreRepository) CreateGenre(ctx context.Context, genre *domain.Genre) 
 	return genreID, nil
 }
 
-func (r *genreRepository) UpdateGenre(ctx context.Context, genre *domain.Genre) error {
+func (r *genreRepository) UpdateGenre(ctx context.Context, genre *model.Genre) error {
 	res, err := r.db.ExecContext(ctx,
 		"UPDATE genres SET name = $1 WHERE genre_id = $2",
 		genre.Name, genre.GenreID,

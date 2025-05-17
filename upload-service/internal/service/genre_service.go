@@ -4,25 +4,19 @@ import (
 	"context"
 	"errors"
 	"log"
-	"upload-service/internal/domain"
-	"upload-service/internal/repository"
+	"upload-service/internal/domain/genre"
+	"upload-service/internal/domain/model"
 )
 
-type GenreService interface {
-	GetAllGenres(ctx context.Context) ([]domain.Genre, error)
-	CreateGenre(ctx context.Context, genre *domain.Genre) (int64, error)
-	UpdateGenre(ctx context.Context, genre *domain.Genre) error
-}
-
 type genreService struct {
-	repo repository.GenreRepository
+	repo genre.Repository
 }
 
-func NewGenreService(r repository.GenreRepository) GenreService {
+func NewGenreService(r genre.Repository) *genreService {
 	return &genreService{repo: r}
 }
 
-func (s *genreService) GetAllGenres(ctx context.Context) ([]domain.Genre, error) {
+func (s *genreService) GetAllGenres(ctx context.Context) ([]model.Genre, error) {
 	genres, err := s.repo.GetAllGenres(ctx)
 	if err != nil {
 		log.Printf("Ошибка при получении жанров: %v", err)
@@ -31,7 +25,7 @@ func (s *genreService) GetAllGenres(ctx context.Context) ([]domain.Genre, error)
 	return genres, nil
 }
 
-func (s *genreService) CreateGenre(ctx context.Context, genre *domain.Genre) (int64, error) {
+func (s *genreService) CreateGenre(ctx context.Context, genre *model.Genre) (int64, error) {
 	if genre.Name == "" {
 		return 0, errors.New("название жанра не может быть пустым")
 	}
@@ -46,7 +40,7 @@ func (s *genreService) CreateGenre(ctx context.Context, genre *domain.Genre) (in
 	return genreID, nil
 }
 
-func (s *genreService) UpdateGenre(ctx context.Context, genre *domain.Genre) error {
+func (s *genreService) UpdateGenre(ctx context.Context, genre *model.Genre) error {
 	if genre.GenreID <= 0 {
 		return errors.New("некорректный ID жанра для обновления")
 	}

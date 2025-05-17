@@ -5,25 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"upload-service/internal/domain"
+	"upload-service/internal/domain/model"
 	"upload-service/internal/domain/response"
-	"upload-service/internal/repository"
+	"upload-service/internal/domain/song"
 )
 
 var ErrSongNotFound = errors.New("песня не найдена")
 
-type SongService interface {
-	GetAllSongs(ctx context.Context) ([]response.SongResponse, error)
-	GetSongByID(ctx context.Context, id int64) (*response.SongResponse, error)
-	CreateSong(ctx context.Context, song *domain.Song, artistIDs []int64) error
-	UpdateSong(ctx context.Context, song *domain.Song) error
-}
-
 type songService struct {
-	repo repository.SongRepository
+	repo song.Repository
 }
 
-func NewSongService(r repository.SongRepository) SongService {
+func NewSongService(r song.Repository) *SongService {
 	return &songService{repo: r}
 }
 
@@ -84,7 +77,7 @@ func (s *songService) GetSongByID(ctx context.Context, id int64) (*response.Song
 	return &res, nil
 }
 
-func (s *songService) CreateSong(ctx context.Context, song *domain.Song, artistIDs []int64) error {
+func (s *songService) CreateSong(ctx context.Context, song *model.Song, artistIDs []int64) error {
 	if song.Name == "" {
 		return errors.New("название песни не может быть пустым")
 	}
@@ -122,7 +115,7 @@ func (s *songService) CreateSong(ctx context.Context, song *domain.Song, artistI
 	return nil
 }
 
-func (s *songService) UpdateSong(ctx context.Context, song *domain.Song) error {
+func (s *songService) UpdateSong(ctx context.Context, song *model.Song) error {
 	if song.SongID <= 0 {
 		return errors.New("некорректный ID песни для обновления")
 	}

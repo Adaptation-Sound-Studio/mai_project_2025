@@ -5,36 +5,27 @@ import (
 	"database/sql"
 	"fmt"
 	"upload-service/internal/domain"
+	"upload-service/internal/domain/artist"
 )
-
-type ArtistRepository interface {
-	GetAllArtists(ctx context.Context) ([]domain.Artist, error)
-	GetArtistByID(ctx context.Context, id int64) (*domain.Artist, error)
-	GetArtistByUserID(ctx context.Context, userID int64) (*domain.Artist, error)
-	CreateArtist(ctx context.Context, artist *domain.Artist, userID int64) (int64, error)
-	UpdateArtist(ctx context.Context, artist *domain.Artist) error
-	GetSongsByArtistID(ctx context.Context, artistID int64) ([]domain.Song, error)
-	GetAlbumsByArtistID(ctx context.Context, artistID int64) ([]domain.Album, error)
-}
 
 type artistRepository struct {
 	db *sql.DB
 }
 
-func NewArtistRepository(db *sql.DB) ArtistRepository {
+func NewArtistRepository(db *sql.DB) artist.Repository {
 	return &artistRepository{db: db}
 }
 
-func (r *artistRepository) GetAllArtists(ctx context.Context) ([]domain.Artist, error) {
+func (r *artistRepository) GetAllArtists(ctx context.Context) ([]artist.Artist, error) {
 	rows, err := r.db.QueryContext(ctx, "SELECT artist_id, name, user_id FROM artists")
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var artists []domain.Artist
+	var artists []artist.Artist
 	for rows.Next() {
-		var a domain.Artist
+		var a artist.Artist
 		if err := rows.Scan(&a.ArtistID, &a.Name, &a.UserID); err != nil {
 			return nil, err
 		}
@@ -48,9 +39,9 @@ func (r *artistRepository) GetAllArtists(ctx context.Context) ([]domain.Artist, 
 	return artists, nil
 }
 
-func (r *artistRepository) GetArtistByID(ctx context.Context, id int64) (*domain.Artist, error) {
+func (r *artistRepository) GetArtistByID(ctx context.Context, id int64) (*artist.Artist, error) {
 	row := r.db.QueryRowContext(ctx, "SELECT artist_id, name, user_id FROM artists WHERE artist_id = $1", id)
-	var a domain.Artist
+	var a artist.Artist
 	err := row.Scan(&a.ArtistID, &a.Name, &a.UserID)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -61,9 +52,9 @@ func (r *artistRepository) GetArtistByID(ctx context.Context, id int64) (*domain
 	return &a, nil
 }
 
-func (r *artistRepository) GetArtistByUserID(ctx context.Context, userID int64) (*domain.Artist, error) {
+func (r *artistRepository) GetArtistByUserID(ctx context.Context, userID int64) (*artist.Artist, error) {
 	row := r.db.QueryRowContext(ctx, "SELECT artist_id, name, user_id FROM artists WHERE user_id = $1", userID)
-	var a domain.Artist
+	var a artist.Artist
 	err := row.Scan(&a.ArtistID, &a.Name, &a.UserID)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -74,7 +65,7 @@ func (r *artistRepository) GetArtistByUserID(ctx context.Context, userID int64) 
 	return &a, nil
 }
 
-func (r *artistRepository) CreateArtist(ctx context.Context, artist *domain.Artist, userID int64) (int64, error) {
+func (r *artistRepository) CreateArtist(ctx context.Context, artist *artist.Artist, userID int64) (int64, error) {
 	var artistID int64
 	err := r.db.QueryRowContext(ctx,
 		"INSERT INTO artists (name, user_id) VALUES ($1, $2) RETURNING artist_id",
@@ -86,7 +77,7 @@ func (r *artistRepository) CreateArtist(ctx context.Context, artist *domain.Arti
 	return artistID, nil
 }
 
-func (r *artistRepository) UpdateArtist(ctx context.Context, artist *domain.Artist) error {
+func (r *artistRepository) UpdateArtist(ctx context.Context, artist *artist.Artist) error {
 	res, err := r.db.ExecContext(ctx,
 		"UPDATE artists SET name = $1 WHERE artist_id = $2",
 		artist.Name, artist.ArtistID,
