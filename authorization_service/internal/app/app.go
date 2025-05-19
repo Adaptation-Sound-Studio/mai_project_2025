@@ -1,22 +1,28 @@
 package app
 
 import (
+	"auth_service/internal/infrastructure/session"
 	"auth_service/internal/repository/postgres"
 	"auth_service/internal/service"
 	"auth_service/internal/transport/http/handler"
 	"auth_service/internal/transport/http/router"
 	"database/sql"
+	"time"
 
 	"log"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 )
 
-func BuildRouter(dbConn *sql.DB) (*mux.Router, error) {
+func BuildRouter(dbConn *sql.DB, redisClient *redis.Client) (*mux.Router, error) {
+
+	sessionManager := session.NewRedisSessionManager(redisClient)
 
 	// Инициализация зависимостей
 	userRepo := postgres.NewUserRepository(dbConn)
-	authService := service.NewAuthService(userRepo)
+
+	authService := service.NewAuthService(userRepo, sessionManager, time.Hour*24)
 	userService := service.NewUserService(userRepo)
 
 	authHandler := handler.NewAuthHandler(authService)

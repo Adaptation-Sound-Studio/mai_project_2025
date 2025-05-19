@@ -6,7 +6,9 @@ import (
 	"auth_service/internal/infrastructure/db"
 	"log"
 	nethttp "net/http"
+	"os"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/joho/godotenv"
 )
 
@@ -17,13 +19,17 @@ func main() {
 
 	cfg := config.LoadConfig()
 
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: os.Getenv("REDIS_ADDR"),
+	})
+
 	dbConn, err := db.NewPostgresConnection(cfg.DB)
 	if err != nil {
 		log.Fatalf("Ошибка подключения к базе данных: %v", err)
 	}
 	defer dbConn.Close()
 
-	router, err := app.BuildRouter(dbConn)
+	router, err := app.BuildRouter(dbConn, redisClient)
 	if err != nil {
 		log.Fatalf("init failed: %v", err)
 	}
