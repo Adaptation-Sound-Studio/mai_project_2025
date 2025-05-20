@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -11,14 +10,18 @@ import (
 	"upload-service/internal/domain/model"
 	"upload-service/internal/domain/request"
 	"upload-service/internal/service"
+	auth "upload-service/internal/transport/http/helper"
+
+	redislib "github.com/go-redis/redis/v8"
 )
 
 type SongHandler struct {
-	Service *service.SongService
+	Service     *service.SongService
+	RedisClient *redislib.Client
 }
 
-func NewSongHandler(service *service.SongService) *SongHandler {
-	return &SongHandler{Service: service}
+func NewSongHandler(service *service.SongService, redisClient *redislib.Client) *SongHandler {
+	return &SongHandler{Service: service, RedisClient: redisClient}
 }
 
 func (h *SongHandler) GetAllSongs(w http.ResponseWriter, r *http.Request) {
@@ -26,63 +29,54 @@ func (h *SongHandler) GetAllSongs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Метод не разрешён", http.StatusMethodNotAllowed)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-
 	songs, err := h.Service.GetAllSongs(r.Context())
 	if err != nil {
-		log.Printf("Ошибка при получении песен: %v", err)
-		http.Error(w, `{"error": "Ошибка при получении песен"}`, http.StatusInternalServerError)
+		http.Error(w, "Ошибка при получении песен", http.StatusInternalServerError)
 		return
 	}
-
 	json.NewEncoder(w).Encode(songs)
 }
 
 func (h *SongHandler) GetSongByID(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Метод не разрешён", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	idStr := mux.Vars(r)["id"]
+	idStr := mux.Vars(r)["song_id"]
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
-		log.Printf("Некорректный ID песни: %v", err)
-		http.Error(w, `{"error": "Некорректный ID песни"}`, http.StatusBadRequest)
+		http.Error(w, "Некорректный ID песни", http.StatusBadRequest)
 		return
 	}
 
 	song, err := h.Service.GetSongByID(r.Context(), id)
 	if err != nil {
-		log.Printf("Ошибка при получении песни с ID %d: %v", id, err)
-		http.Error(w, `{"error": "Ошибка при получении песни"}`, http.StatusInternalServerError)
+		http.Error(w, "Ошибка при получении песни", http.StatusInternalServerError)
 		return
 	}
 	if song == nil {
-		log.Printf("Песня с ID %d не найдена", id)
-		http.Error(w, `{"error": "Песня не найдена"}`, http.StatusNotFound)
+		http.Error(w, "Песня не найдена", http.StatusNotFound)
 		return
 	}
-
 	json.NewEncoder(w).Encode(song)
 }
 
 func (h *SongHandler) CreateSong(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Метод не разрешён", http.StatusMethodNotAllowed)
+	currentArtistID, err := auth.GetCurrentArtistID(r, h.RedisClient)
+	if err != nil {
+		http.Error(w, err.Error(), err.(*auth.HttpError).Code)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
 	var req request.CreateSongRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Printf("Неверный формат запроса: %v", err)
-		http.Error(w, `{"error": "Неверный формат запроса"}`, http.StatusBadRequest)
+		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
 		return
+	}
+
+	artistSet := map[int64]struct{}{currentArtistID: {}}
+	for _, id := range req.ArtistIDs {
+		artistSet[id] = struct{}{}
+	}
+	var allArtistIDs []int64
+	for id := range artistSet {
+		allArtistIDs = append(allArtistIDs, id)
 	}
 
 	song := &model.Song{
@@ -91,9 +85,8 @@ func (h *SongHandler) CreateSong(w http.ResponseWriter, r *http.Request) {
 		Link:    req.Link,
 	}
 
-	if err := h.Service.CreateSong(r.Context(), song, req.ArtistIDs); err != nil {
-		log.Printf("Ошибка при создании песни: %v", err)
-		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusBadRequest)
+	if err := h.Service.CreateSong(r.Context(), song, allArtistIDs); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -102,38 +95,52 @@ func (h *SongHandler) CreateSong(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SongHandler) UpdateSong(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPut {
-		http.Error(w, "Метод не разрешён", http.StatusMethodNotAllowed)
+	currentArtistID, err := auth.GetCurrentArtistID(r, h.RedisClient)
+	if err != nil {
+		http.Error(w, err.Error(), err.(*auth.HttpError).Code)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	idStr := mux.Vars(r)["song_id"]
+	songID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || songID <= 0 {
+		http.Error(w, "Некорректный ID песни", http.StatusBadRequest)
+		return
+	}
 
-	idStr := mux.Vars(r)["id"]
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil || id <= 0 {
-		log.Printf("Некорректный ID песни для обновления: %v", err)
-		http.Error(w, `{"error": "Некорректный ID песни"}`, http.StatusBadRequest)
+	artists, err := h.Service.GetSongArtists(r.Context(), songID)
+	if err != nil {
+		http.Error(w, "Ошибка при проверке прав", http.StatusInternalServerError)
+		return
+	}
+
+	allowed := false
+	for _, a := range artists {
+		if a.ArtistID == currentArtistID {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		http.Error(w, "Вы не можете редактировать эту песню", http.StatusForbidden)
 		return
 	}
 
 	var req request.UpdateSongRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Printf("Неверный формат запроса при обновлении песни: %v", err)
-		http.Error(w, `{"error": "Неверный формат запроса"}`, http.StatusBadRequest)
+		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
 		return
 	}
 
 	song := &model.Song{
-		SongID:  id,
+		SongID:  songID,
 		Name:    req.Name,
 		GenreID: req.GenreID,
 		Link:    req.Link,
 	}
 
 	if err := h.Service.UpdateSong(r.Context(), song); err != nil {
-		log.Printf("Ошибка при обновлении песни с ID %d: %v", id, err)
-		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 

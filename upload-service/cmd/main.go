@@ -1,47 +1,65 @@
 package main
 
 import (
-	"context"
-	"fmt"
 	"log"
-	"upload-service/internal/infrastructure/db"
+	"net/http"
+
+	"github.com/joho/godotenv"
+
+	"upload-service/internal/config"
+	dbinfra "upload-service/internal/infrastructure/db"
+	redisinfra "upload-service/internal/infrastructure/redis"
 	"upload-service/internal/repository"
+	"upload-service/internal/service"
+	router "upload-service/internal/transport/http"
+	"upload-service/internal/transport/http/handler"
 )
 
 func main() {
-	database, err := db.NewPostgresDB()
-	if err != nil {
-		log.Fatalf("Ошибка подключения к БД: %v", err)
+	if err := godotenv.Load(); err != nil {
+		log.Println("Файл .env не найден — используем переменные окружения")
 	}
-	defer database.Close()
 
-	ctx := context.Background()
+	cfg := config.LoadConfig()
 
-	songRepo := repository.NewSongRepository(database)
-	songs, err := songRepo.GetAllSongs(ctx)
+	db, err := dbinfra.NewPostgresConnection(cfg.DB)
 	if err != nil {
-		log.Fatalf("Ошибка при получении песен: %v", err)
+		log.Fatalf("Ошибка подключения к Postgres: %v", err)
 	}
-	fmt.Println("Все песни:", songs)
+	defer db.Close()
 
-	albumRepo := repository.NewAlbumRepository(database)
-	albums, err := albumRepo.GetAllAlbums(ctx)
-	if err != nil {
-		log.Fatalf("Ошибка при получении альбомов: %v", err)
-	}
-	fmt.Println("Все альбомы:", albums)
+	redisClient := redisinfra.NewRedisClient(cfg.Redis)
+	defer redisClient.Close()
 
-	artistRepo := repository.NewArtistRepository(database)
-	artists, err := artistRepo.GetAllArtists(ctx)
-	if err != nil {
-		log.Fatalf("Ошибка при получении артистов: %v", err)
-	}
-	fmt.Println("Все артисты:", artists)
+	genreRepo := repository.NewGenreRepository(db)
+	artistRepo := repository.NewArtistRepository(db)
+	songRepo := repository.NewSongRepository(db)
+	albumRepo := repository.NewAlbumRepository(db)
 
-	genreRepo := repository.NewGenreRepository(database)
-	genres, err := genreRepo.GetAllGenres(ctx)
-	if err != nil {
-		log.Fatalf("Ошибка при получении жанров: %v", err)
+	genreService := service.NewGenreService(genreRepo)
+	artistService := service.NewArtistService(artistRepo)
+	songService := service.NewSongService(songRepo)
+	albumService := service.NewAlbumService(db, albumRepo)
+
+	genreHandler := handler.NewGenreHandler(genreService)
+	artistHandler := handler.NewArtistHandler(artistService, redisClient)
+	songHandler := handler.NewSongHandler(songService, redisClient)
+	albumHandler := handler.NewAlbumHandler(albumService, redisClient)
+
+	router := router.NewRouter(
+		genreHandler,
+		artistHandler,
+		songHandler,
+		albumHandler,
+		redisClient,
+	)
+
+	port := cfg.Server.Port
+	if port == "" {
+		port = "8080"
 	}
-	fmt.Println("Все жанры:", genres)
+	log.Printf("Сервер запущен на порту %s", port)
+	if err := http.ListenAndServe(":"+port, router); err != nil {
+		log.Fatalf("Ошибка запуска HTTP-сервера: %v", err)
+	}
 }

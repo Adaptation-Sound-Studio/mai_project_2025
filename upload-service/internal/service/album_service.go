@@ -6,30 +6,23 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"upload-service/internal/domain"
+	"upload-service/internal/domain/album"
+	"upload-service/internal/domain/model"
 	"upload-service/internal/domain/response"
-	"upload-service/internal/repository"
 )
 
 var ErrAlbumNotFound = errors.New("альбом не найден")
 
-type AlbumService interface {
-	GetAllAlbums(ctx context.Context) ([]domain.Album, error)
-	GetAlbumByID(ctx context.Context, id int64) (*response.AlbumResponse, error)
-	CreateAlbum(ctx context.Context, album *domain.Album, songIDs []int64) (int64, error)
-	UpdateAlbum(ctx context.Context, album *domain.Album) error
-}
-
-type albumService struct {
+type AlbumService struct {
 	db   *sql.DB
-	repo repository.AlbumRepository
+	repo album.Repository
 }
 
-func NewAlbumService(db *sql.DB, r repository.AlbumRepository) AlbumService {
-	return &albumService{db: db, repo: r}
+func NewAlbumService(db *sql.DB, r album.Repository) *AlbumService {
+	return &AlbumService{db: db, repo: r}
 }
 
-func (s *albumService) GetAllAlbums(ctx context.Context) ([]domain.Album, error) {
+func (s *AlbumService) GetAllAlbums(ctx context.Context) ([]model.Album, error) {
 	albums, err := s.repo.GetAllAlbums(ctx)
 	if err != nil {
 		log.Printf("Ошибка при получении всех альбомов: %v", err)
@@ -38,7 +31,7 @@ func (s *albumService) GetAllAlbums(ctx context.Context) ([]domain.Album, error)
 	return albums, nil
 }
 
-func (s *albumService) GetAlbumByID(ctx context.Context, id int64) (*response.AlbumResponse, error) {
+func (s *AlbumService) GetAlbumByID(ctx context.Context, id int64) (*response.AlbumResponse, error) {
 	if id <= 0 {
 		return nil, errors.New("некорректный ID альбома")
 	}
@@ -62,7 +55,7 @@ func (s *albumService) GetAlbumByID(ctx context.Context, id int64) (*response.Al
 	return &res, nil
 }
 
-func (s *albumService) CreateAlbum(ctx context.Context, album *domain.Album, songIDs []int64) (int64, error) {
+func (s *AlbumService) CreateAlbum(ctx context.Context, album *model.Album, songIDs []int64) (int64, error) {
 	if album.Name == "" {
 		return 0, errors.New("название альбома не может быть пустым")
 	}
@@ -115,7 +108,7 @@ func (s *albumService) CreateAlbum(ctx context.Context, album *domain.Album, son
 	return albumID, nil
 }
 
-func (s *albumService) UpdateAlbum(ctx context.Context, album *domain.Album) error {
+func (s *AlbumService) UpdateAlbum(ctx context.Context, album *model.Album) error {
 	if album.AlbumID <= 0 {
 		return errors.New("некорректный ID альбома для обновления")
 	}

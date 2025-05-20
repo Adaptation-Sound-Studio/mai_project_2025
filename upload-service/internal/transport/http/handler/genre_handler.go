@@ -9,6 +9,8 @@ import (
 	"upload-service/internal/domain/model"
 	"upload-service/internal/domain/request"
 	"upload-service/internal/service"
+
+	"github.com/gorilla/mux"
 )
 
 type GenreHandler struct {
@@ -74,7 +76,7 @@ func (h *GenreHandler) UpdateGenre(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	idStr := r.URL.Query().Get("id")
+	idStr := mux.Vars(r)["genre_id"]
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
 		log.Printf("Некорректный ID жанра для обновления: %v", err)

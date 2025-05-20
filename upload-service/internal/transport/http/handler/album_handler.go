@@ -11,14 +11,21 @@ import (
 	"upload-service/internal/domain/model"
 	"upload-service/internal/domain/request"
 	"upload-service/internal/service"
+	auth "upload-service/internal/transport/http/helper"
+
+	redislib "github.com/go-redis/redis/v8"
 )
 
 type AlbumHandler struct {
-	Service *service.AlbumService
+	Service     *service.AlbumService
+	RedisClient *redislib.Client
 }
 
-func NewAlbumHandler(service *service.AlbumService) *AlbumHandler {
-	return &AlbumHandler{Service: service}
+func NewAlbumHandler(service *service.AlbumService, redisClient *redislib.Client) *AlbumHandler {
+	return &AlbumHandler{
+		Service:     service,
+		RedisClient: redisClient,
+	}
 }
 
 func (h *AlbumHandler) GetAllAlbums(w http.ResponseWriter, r *http.Request) {
@@ -44,7 +51,7 @@ func (h *AlbumHandler) GetAlbumByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	idStr := mux.Vars(r)["id"]
+	idStr := mux.Vars(r)["album_id"]
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
 		log.Printf("Некорректный ID альбома: %v", err)
@@ -69,8 +76,9 @@ func (h *AlbumHandler) GetAlbumByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AlbumHandler) CreateAlbum(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Метод не разрешён", http.StatusMethodNotAllowed)
+	currentArtistID, err := auth.GetCurrentArtistID(r, h.RedisClient)
+	if err != nil {
+		http.Error(w, err.Error(), err.(*auth.HttpError).Code)
 		return
 	}
 
@@ -83,8 +91,8 @@ func (h *AlbumHandler) CreateAlbum(w http.ResponseWriter, r *http.Request) {
 
 	album := &model.Album{
 		Name:     req.Name,
-		ArtistID: req.ArtistID,
 		GenreID:  req.GenreID,
+		ArtistID: currentArtistID,
 	}
 
 	albumID, err := h.Service.CreateAlbum(r.Context(), album, req.SongIDs)
@@ -103,35 +111,47 @@ func (h *AlbumHandler) CreateAlbum(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AlbumHandler) UpdateAlbum(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPut {
-		http.Error(w, "Метод не разрешён", http.StatusMethodNotAllowed)
+	currentArtistID, err := auth.GetCurrentArtistID(r, h.RedisClient)
+	if err != nil {
+		http.Error(w, err.Error(), err.(*auth.HttpError).Code)
 		return
 	}
 
-	idStr := mux.Vars(r)["id"]
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil || id <= 0 {
-		log.Printf("Некорректный ID альбома для обновления: %v", err)
+	idStr := mux.Vars(r)["album_id"]
+	albumID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || albumID <= 0 {
+		log.Printf("Некорректный ID альбома: %v", err)
 		http.Error(w, "Некорректный ID альбома", http.StatusBadRequest)
+		return
+	}
+
+	albumResp, err := h.Service.GetAlbumByID(r.Context(), albumID)
+	if err != nil {
+		log.Printf("Ошибка при получении альбома: %v", err)
+		http.Error(w, "Ошибка при получении альбома", http.StatusInternalServerError)
+		return
+	}
+	if albumResp == nil || albumResp.ArtistID != currentArtistID {
+		http.Error(w, "Вы не можете редактировать этот альбом", http.StatusForbidden)
 		return
 	}
 
 	var req request.UpdateAlbumRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Printf("Неверный формат запроса при обновлении альбома: %v", err)
+		log.Printf("Неверный формат запроса: %v", err)
 		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
 		return
 	}
 
 	album := &model.Album{
-		AlbumID:  id,
+		AlbumID:  albumID,
 		Name:     req.Name,
 		GenreID:  req.GenreID,
-		ArtistID: req.ArtistID,
+		ArtistID: currentArtistID,
 	}
 
 	if err := h.Service.UpdateAlbum(r.Context(), album); err != nil {
-		log.Printf("Ошибка при обновлении альбома с ID %d: %v", id, err)
+		log.Printf("Ошибка при обновлении альбома: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

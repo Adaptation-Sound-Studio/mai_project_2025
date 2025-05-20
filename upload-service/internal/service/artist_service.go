@@ -6,20 +6,21 @@ import (
 	"fmt"
 	"log"
 	"upload-service/internal/domain/artist"
+	"upload-service/internal/domain/model"
 	"upload-service/internal/domain/response"
 )
 
 var ErrArtistNotFound = errors.New("артист не найден")
 
-type artistService struct {
+type ArtistService struct {
 	repo artist.Repository
 }
 
-func NewArtistService(r artist.Repository) *artistService {
-	return &artistService{repo: r}
+func NewArtistService(r artist.Repository) *ArtistService {
+	return &ArtistService{repo: r}
 }
 
-func (s *artistService) GetAllArtists(ctx context.Context) ([]artist.Artist, error) {
+func (s *ArtistService) GetAllArtists(ctx context.Context) ([]model.Artist, error) {
 	artists, err := s.repo.GetAllArtists(ctx)
 	if err != nil {
 		log.Printf("Ошибка при получении всех артистов: %v", err)
@@ -28,7 +29,7 @@ func (s *artistService) GetAllArtists(ctx context.Context) ([]artist.Artist, err
 	return artists, nil
 }
 
-func (s *artistService) GetArtistByID(ctx context.Context, id int64) (*response.ArtistResponse, error) {
+func (s *ArtistService) GetArtistByID(ctx context.Context, id int64) (*response.ArtistResponse, error) {
 	if id <= 0 {
 		return nil, errors.New("некорректный ID артиста")
 	}
@@ -58,7 +59,7 @@ func (s *artistService) GetArtistByID(ctx context.Context, id int64) (*response.
 	return &res, nil
 }
 
-func (s *artistService) RegisterArtist(ctx context.Context, artist *artist.Artist, userID int64) (int64, error) {
+func (s *ArtistService) RegisterArtist(ctx context.Context, artist *model.Artist, userID int64) (int64, error) {
 	if artist.Name == "" {
 		return 0, errors.New("имя артиста не может быть пустым")
 	}
@@ -82,7 +83,7 @@ func (s *artistService) RegisterArtist(ctx context.Context, artist *artist.Artis
 	return artistID, nil
 }
 
-func (s *artistService) UpdateArtist(ctx context.Context, artist *artist.Artist) error {
+func (s *ArtistService) UpdateArtist(ctx context.Context, artist *model.Artist) error {
 	if artist.ArtistID <= 0 {
 		return errors.New("некорректный ID артиста для обновления")
 	}

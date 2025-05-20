@@ -12,15 +12,15 @@ import (
 
 var ErrSongNotFound = errors.New("песня не найдена")
 
-type songService struct {
+type SongService struct {
 	repo song.Repository
 }
 
 func NewSongService(r song.Repository) *SongService {
-	return &songService{repo: r}
+	return &SongService{repo: r}
 }
 
-func (s *songService) GetAllSongs(ctx context.Context) ([]response.SongResponse, error) {
+func (s *SongService) GetAllSongs(ctx context.Context) ([]response.SongResponse, error) {
 	songs, err := s.repo.GetAllSongs(ctx)
 	if err != nil {
 		log.Printf("Ошибка при получении песен: %v", err)
@@ -47,7 +47,7 @@ func (s *songService) GetAllSongs(ctx context.Context) ([]response.SongResponse,
 	return responses, nil
 }
 
-func (s *songService) GetSongByID(ctx context.Context, id int64) (*response.SongResponse, error) {
+func (s *SongService) GetSongByID(ctx context.Context, id int64) (*response.SongResponse, error) {
 	if id <= 0 {
 		return nil, errors.New("ID песни должен быть положительным числом")
 	}
@@ -77,7 +77,7 @@ func (s *songService) GetSongByID(ctx context.Context, id int64) (*response.Song
 	return &res, nil
 }
 
-func (s *songService) CreateSong(ctx context.Context, song *model.Song, artistIDs []int64) error {
+func (s *SongService) CreateSong(ctx context.Context, song *model.Song, artistIDs []int64) error {
 	if song.Name == "" {
 		return errors.New("название песни не может быть пустым")
 	}
@@ -115,7 +115,7 @@ func (s *songService) CreateSong(ctx context.Context, song *model.Song, artistID
 	return nil
 }
 
-func (s *songService) UpdateSong(ctx context.Context, song *model.Song) error {
+func (s *SongService) UpdateSong(ctx context.Context, song *model.Song) error {
 	if song.SongID <= 0 {
 		return errors.New("некорректный ID песни для обновления")
 	}
@@ -158,4 +158,8 @@ func findMissingIDs(input, existing []int64) []int64 {
 		}
 	}
 	return missing
+}
+
+func (s *SongService) GetSongArtists(ctx context.Context, songID int64) ([]model.Artist, error) {
+	return s.repo.GetArtistsBySongID(ctx, songID)
 }

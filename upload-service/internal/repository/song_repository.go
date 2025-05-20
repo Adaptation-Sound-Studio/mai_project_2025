@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"upload-service/internal/domain/model"
 	"upload-service/internal/domain/song"
+
+	"github.com/lib/pq"
 )
 
 type songRepository struct {
@@ -118,7 +120,7 @@ func (r *songRepository) UpdateSong(ctx context.Context, song *model.Song) error
 
 func (r *songRepository) CheckArtistsExist(ctx context.Context, artistIDs []int64) ([]int64, error) {
 	query := "SELECT artist_id FROM artists WHERE artist_id = ANY($1)"
-	rows, err := r.db.QueryContext(ctx, query, artistIDs)
+	rows, err := r.db.QueryContext(ctx, query, pq.Array(artistIDs))
 	if err != nil {
 		return nil, err
 	}

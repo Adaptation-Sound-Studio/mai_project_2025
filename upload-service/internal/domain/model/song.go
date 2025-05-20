@@ -1,4 +1,4 @@
-package song
+package model
 
 import "time"
 

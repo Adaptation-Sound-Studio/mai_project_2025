@@ -1,4 +1,4 @@
-package domain
+package model
 
 type Genre struct {
 	GenreID int64  `json:"genre_id"`

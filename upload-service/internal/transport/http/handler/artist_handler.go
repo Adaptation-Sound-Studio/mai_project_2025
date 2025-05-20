@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	appredis "upload-service/internal/infrastructure/redis"
+	auth "upload-service/internal/transport/http/helper"
 
 	redislib "github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
@@ -51,7 +52,7 @@ func (h *ArtistHandler) GetArtistByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	idStr := mux.Vars(r)["id"]
+	idStr := mux.Vars(r)["artist_id"]
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
 		log.Printf("Некорректный ID артиста: %v", err)
@@ -81,24 +82,9 @@ func (h *ArtistHandler) RegisterArtist(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sessionID := r.Header.Get("Authorization")
-	if sessionID == "" {
-		log.Printf("Отсутствует токен сессии")
-		http.Error(w, "Отсутствует токен сессии", http.StatusUnauthorized)
-		return
-	}
-
-	userIDStr, err := appredis.GetUserID(h.RedisClient, sessionID)
+	userID, userIDStr, err := auth.GetUserID(r, h.RedisClient)
 	if err != nil {
-		log.Printf("Ошибка при получении user_id из Redis для сессии %s: %v", sessionID, err)
-		http.Error(w, "Сессия недействительна или просрочена", http.StatusUnauthorized)
-		return
-	}
-
-	userID, err := strconv.ParseInt(userIDStr, 10, 64)
-	if err != nil {
-		log.Printf("Ошибка при конвертации user_id %s в int64: %v", userIDStr, err)
-		http.Error(w, "Некорректный user_id в Redis", http.StatusInternalServerError)
+		http.Error(w, err.Error(), err.(*auth.HttpError).Code)
 		return
 	}
 
@@ -137,11 +123,22 @@ func (h *ArtistHandler) UpdateArtist(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	idStr := mux.Vars(r)["id"]
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil || id <= 0 {
+	idStr := mux.Vars(r)["artist_id"]
+	artistIDParam, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || artistIDParam <= 0 {
 		log.Printf("Некорректный ID артиста для обновления: %v", err)
 		http.Error(w, "Некорректный ID артиста", http.StatusBadRequest)
+		return
+	}
+
+	currentArtistID, err := auth.GetCurrentArtistID(r, h.RedisClient)
+	if err != nil {
+		http.Error(w, err.Error(), err.(*auth.HttpError).Code)
+		return
+	}
+
+	if artistIDParam != currentArtistID {
+		http.Error(w, "Вы не можете редактировать другого артиста", http.StatusForbidden)
 		return
 	}
 
@@ -153,12 +150,12 @@ func (h *ArtistHandler) UpdateArtist(w http.ResponseWriter, r *http.Request) {
 	}
 
 	artist := &model.Artist{
-		ArtistID: id,
+		ArtistID: artistIDParam,
 		Name:     req.Name,
 	}
 
 	if err := h.Service.UpdateArtist(r.Context(), artist); err != nil {
-		log.Printf("Ошибка при обновлении артиста с ID %d: %v", id, err)
+		log.Printf("Ошибка при обновлении артиста с ID %d: %v", artistIDParam, err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
