@@ -67,3 +67,22 @@ func TestCreateGenre_BadJSON(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 	require.Contains(t, rec.Body.String(), "Invalid JSON")
 }
+
+func TestCreateGenre_Forbidden(t *testing.T) {
+	mockRepo := &MockGenreRepo{}
+	service := service.NewGenreService(mockRepo)
+	handler := NewGenreHandler(service, "admin-secret")
+
+	router := mux.NewRouter()
+	router.HandleFunc("/genres", handler.CreateGenre).Methods("POST")
+
+	req := httptest.NewRequest(http.MethodPost, "/genres", bytes.NewReader([]byte(`{"name":"Rock"}`)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Admin-Key", "wrong-key")
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusForbidden, rec.Code)
+	require.Contains(t, rec.Body.String(), "Forbidden")
+}

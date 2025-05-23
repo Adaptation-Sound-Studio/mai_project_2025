@@ -10,6 +10,9 @@ import (
 )
 
 func TestAlbumRepo_Create(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 
 	testutils.CleanTables(t, testutils.TestDB)
 	repo := NewAlbumRepo(testutils.TestDB)
@@ -32,6 +35,9 @@ func TestAlbumRepo_Create(t *testing.T) {
 }
 
 func TestAlbumRepo_Create_NullManually(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	testutils.CleanTables(t, testutils.TestDB)
 	_, err := testutils.TestDB.Exec("INSERT INTO albums (name) VALUES ($1)", nil)
 

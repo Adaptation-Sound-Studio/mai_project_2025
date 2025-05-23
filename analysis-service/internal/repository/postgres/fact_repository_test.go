@@ -9,6 +9,9 @@ import (
 )
 
 func TestFactRepo_Insert_Success(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	testutils.CleanTables(t, testutils.TestDB)
 
 	testutils.TestDB.Exec(`INSERT INTO users (user_id, name) VALUES (1, 'User')`)
@@ -44,6 +47,9 @@ func TestFactRepo_Insert_Success(t *testing.T) {
 }
 
 func TestFactRepo_Insert_InvalidFK(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	testutils.CleanTables(t, testutils.TestDB)
 
 	testutils.TestDB.Exec(`INSERT INTO users (user_id, name) VALUES (1, 'User')`)

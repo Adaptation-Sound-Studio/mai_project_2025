@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"database/sql"
+	"flag"
 	"log"
 	"os"
 	"testing"
@@ -10,6 +11,11 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	flag.Parse()
+
+	if testing.Short() {
+		os.Exit(m.Run())
+	}
 	var err error
 	testutils.TestDB, err = sql.Open("postgres", "host=localhost port=5432 user=postgres password=postgres dbname=analytics_db sslmode=disable")
 	if err != nil {

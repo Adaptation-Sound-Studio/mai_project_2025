@@ -8,7 +8,9 @@ import (
 )
 
 func TestGenretRepo_Create_Success(t *testing.T) {
-
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	testutils.CleanTables(t, testutils.TestDB)
 	repo := NewGenreRepo(testutils.TestDB)
 
@@ -30,6 +32,9 @@ func TestGenretRepo_Create_Success(t *testing.T) {
 }
 
 func TestGenreRepo_Create_DuplicateName(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	testutils.CleanTables(t, testutils.TestDB)
 	repo := NewGenreRepo(testutils.TestDB)
 

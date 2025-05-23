@@ -10,7 +10,9 @@ import (
 )
 
 func TestSongRepo_Create_Success(t *testing.T) {
-
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	testutils.CleanTables(t, testutils.TestDB)
 	repo := NewSongRepo(testutils.TestDB)
 
@@ -32,6 +34,9 @@ func TestSongRepo_Create_Success(t *testing.T) {
 }
 
 func TestSongRepo_Create_NameTooLong(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	testutils.CleanTables(t, testutils.TestDB)
 	repo := NewSongRepo(testutils.TestDB)
 
@@ -47,6 +52,9 @@ func TestSongRepo_Create_NameTooLong(t *testing.T) {
 }
 
 func TestSongRepo_GetPopularSongs(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	testutils.CleanTables(t, testutils.TestDB)
 	testutils.TestDB.Exec(`INSERT INTO artists (name) VALUES ('Artist1')`)
 	testutils.TestDB.Exec(`INSERT INTO albums (name) VALUES ('Album1')`)
@@ -76,6 +84,9 @@ func TestSongRepo_GetPopularSongs(t *testing.T) {
 }
 
 func TestFactListens_Insert_InvalidArtistFK(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	testutils.CleanTables(t, testutils.TestDB)
 
 	testutils.TestDB.Exec(`INSERT INTO albums (album_id, name) VALUES (1, 'Album')`)

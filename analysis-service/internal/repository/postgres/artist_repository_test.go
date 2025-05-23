@@ -10,6 +10,9 @@ import (
 )
 
 func TestArtistRepo_Create_Success(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	testutils.CleanTables(t, testutils.TestDB)
 	repo := NewArtistRepo(testutils.TestDB)
 
@@ -31,6 +34,9 @@ func TestArtistRepo_Create_Success(t *testing.T) {
 }
 
 func TestArtistRepo_Create_NameTooLong(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	testutils.CleanTables(t, testutils.TestDB)
 	repo := NewArtistRepo(testutils.TestDB)
 

@@ -80,3 +80,22 @@ func TestCreateFact_Failure(t *testing.T) {
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
 	require.Contains(t, rec.Body.String(), "Failed to store listen fact")
 }
+
+func TestCreateFact_BadJSON(t *testing.T) {
+	mockRepo := &MockFactRepo{}
+	factService := service.NewFactService(mockRepo)
+	handler := NewFactHandler(factService, "admin-secret")
+
+	router := mux.NewRouter()
+	router.HandleFunc("/facts", handler.CreateFact).Methods("POST")
+
+	req := httptest.NewRequest(http.MethodPost, "/facts", bytes.NewReader([]byte(`not-json`)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Admin-Key", "admin-secret")
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), "Invalid JSON")
+}

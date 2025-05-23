@@ -80,3 +80,45 @@ func TestCreateAlbum_ServiceError(t *testing.T) {
 
 	mockRepo.AssertExpectations(t)
 }
+
+func TestCreateAlbum_BadJSON(t *testing.T) {
+	mockRepo := &MockAlbumRepo{}
+	service := service.NewAlbumService(mockRepo)
+	handler := NewAlbumHandler(service, os.Getenv("ADMIN_SECRET"))
+
+	router := mux.NewRouter()
+	router.HandleFunc("/albums", handler.CreateAlbum).Methods("POST")
+
+	req := httptest.NewRequest(http.MethodPost, "/albums", bytes.NewReader([]byte(`not-json`)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Admin-Key", os.Getenv("ADMIN_SECRET"))
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), "Invalid JSON")
+}
+
+func TestCreateAlbum_Forbidden_NoHeader(t *testing.T) {
+	mockRepo := &MockAlbumRepo{}
+	service := service.NewAlbumService(mockRepo)
+	handler := NewAlbumHandler(service, "admin-secret")
+
+	router := mux.NewRouter()
+	router.HandleFunc("/albums", handler.CreateAlbum).Methods("POST")
+
+	input := album.Album{Name: "No Admin Album"}
+	body, _ := json.Marshal(input)
+
+	req := httptest.NewRequest(http.MethodPost, "/albums", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	// Не устанавливаем ключ админа
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusForbidden, rec.Code)
+	require.Contains(t, rec.Body.String(), "Forbidden")
+	mockRepo.AssertNotCalled(t, "Create", mock.Anything)
+}
