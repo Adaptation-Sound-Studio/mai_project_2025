@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
 	"log"
 	nethttp "net/http"
 
 	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/config"
 	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/infrastructure/db"
+	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/kafka"
+	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/repository/postgres"
+	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/service"
 	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/transport/http"
 )
 
@@ -19,11 +23,11 @@ func main() {
 	}
 	defer dbConn.Close()
 
-	// FactRepo := postgres.NewFactRepo(dbConn)
-	// FactService := service.NewFactService(FactRepo)
+	FactRepo := postgres.NewFactRepo(dbConn)
+	FactService := service.NewFactService(FactRepo)
 
-	// consumer := kafka.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.Topic, FactService)
-	// go consumer.Start(context.Background())
+	consumer := kafka.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.Topic, FactService)
+	go consumer.Start(context.Background())
 
 	router := http.NewRouter(dbConn, cfg.Admin.Secret)
 
