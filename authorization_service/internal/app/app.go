@@ -26,7 +26,7 @@ func BuildRouter(dbConn *sql.DB, redisClient *redis.Client) (*mux.Router, error)
 	userService := service.NewUserService(userRepo)
 
 	authHandler := handler.NewAuthHandler(authService)
-	userHandler := handler.NewUserHandler(userService)
+	userHandler := handler.NewUserHandler(userService, sessionManager)
 
 	// Создание роутера
 	mux_router := router.NewRouter()
