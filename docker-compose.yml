@@ -29,7 +29,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - pgdata_anal:/var/lib/postgresql/data
-      - ./init/init_auth.sql:/docker-entrypoint-initdb.d/init_auth.sql:ro
+      - ./init/init_anal.sql:/docker-entrypoint-initdb.d/init_anal.sql:ro
     networks:
       - app-net
 
@@ -53,6 +53,21 @@ services:
       - redis
     ports:
       - "8080:8080"
+    env_file:
+      - .env
+    networks:
+      - app-net
+
+  analytics:
+    build:
+      context: ./analysis_service
+      dockerfile: Dockerfile 
+    container_name: analytics-service
+    restart: on-failure
+    depends_on:
+      - anal_postgres
+    ports:
+      - "8081:8081"
     env_file:
       - .env
     networks:

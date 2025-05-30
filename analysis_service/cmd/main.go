@@ -1,15 +1,11 @@
 package main
 
 import (
-	"context"
 	"log"
 	nethttp "net/http"
 
 	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/config"
 	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/infrastructure/db"
-	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/kafka"
-	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/repository/postgres"
-	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/service"
 	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/transport/http"
 )
 
@@ -23,16 +19,16 @@ func main() {
 	}
 	defer dbConn.Close()
 
-	FactRepo := postgres.NewFactRepo(dbConn)
-	FactService := service.NewFactService(FactRepo)
+	// FactRepo := postgres.NewFactRepo(dbConn)
+	// FactService := service.NewFactService(FactRepo)
 
-	consumer := kafka.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.Topic, FactService)
-	go consumer.Start(context.Background())
+	// consumer := kafka.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.Topic, FactService)
+	// go consumer.Start(context.Background())
 
 	router := http.NewRouter(dbConn, cfg.Admin.Secret)
 
-	log.Println("Сервер запущен на порту 8080")
-	if err := nethttp.ListenAndServe(":8080", router); err != nil {
+	log.Println("Сервер запущен на порту 8081")
+	if err := nethttp.ListenAndServe(":8081", router); err != nil {
 		log.Fatalf("Ошибка запуска сервера: %v", err)
 	}
 }

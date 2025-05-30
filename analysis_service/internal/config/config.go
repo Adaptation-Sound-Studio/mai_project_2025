@@ -2,11 +2,8 @@ package config
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
-
-	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -41,10 +38,6 @@ func splitEnv(key string) []string {
 }
 
 func LoadConfig() *Config {
-
-	if err := godotenv.Load(); err != nil {
-		log.Println(".env файл не найден, используются переменные среды")
-	}
 
 	return &Config{
 		DB: DBConfig{
