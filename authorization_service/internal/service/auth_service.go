@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -56,18 +57,22 @@ func (s *AuthService) LoginUser(ctx context.Context, login, password string) (st
 	usr, err := s.Repo.GetByLogin(login)
 	if err != nil {
 		if err == sql.ErrNoRows {
+			log.Printf("Login failed: no user with login %s", login)
 			return "", errors.New("invalid login or password")
 		}
+		log.Printf("Login failed: error querying user by login %s: %v", login, err)
 		return "", err
 	}
 
 	if usr.IsDeleted {
+		log.Printf("Login failed: user %s is marked as deleted", login)
 		return "", errors.New("user is deleted")
 	}
 
 	// Проверка пароля
 	err = bcrypt.CompareHashAndPassword([]byte(usr.Pass), []byte(password))
 	if err != nil {
+		log.Printf("Login failed: incorrect password for login %s", login)
 		return "", errors.New("invalid login or password")
 	}
 
@@ -84,8 +89,11 @@ func (s *AuthService) LoginUser(ctx context.Context, login, password string) (st
 	// Создание сессии в Redis с TTL
 	err = s.SessionManager.CreateSession(ctx, sessionID, sessionData, s.SessionTTL)
 	if err != nil {
+		log.Printf("Login failed: error creating session for user %s (ID: %d): %v", login, usr.ID, err)
 		return "", err
 	}
+
+	log.Printf("Login successful for user %s (ID: %d), session ID: %s", login, usr.ID, sessionID)
 
 	return sessionID, nil
 }

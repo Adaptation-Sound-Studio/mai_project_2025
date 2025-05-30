@@ -4,23 +4,20 @@ import (
 	"auth_service/internal/app"
 	"auth_service/internal/config"
 	"auth_service/internal/infrastructure/db"
+	"fmt"
 	"log"
 	nethttp "net/http"
 	"os"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Println("Файл .env не найден")
-	}
-
 	cfg := config.LoadConfig()
 
+	redisAddr := fmt.Sprintf("%s:%s", os.Getenv("REDIS_HOST"), os.Getenv("REDIS_PORT"))
 	redisClient := redis.NewClient(&redis.Options{
-		Addr: os.Getenv("REDIS_ADDR"),
+		Addr: redisAddr,
 	})
 
 	dbConn, err := db.NewPostgresConnection(cfg.DB)
