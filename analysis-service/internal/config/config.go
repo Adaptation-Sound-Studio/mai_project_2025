@@ -48,11 +48,11 @@ func LoadConfig() *Config {
 
 	return &Config{
 		DB: DBConfig{
-			Host:     os.Getenv("DB_HOST"),
-			Port:     os.Getenv("DB_PORT"),
+			Host:     os.Getenv("ANAL_DB_HOST"),
+			Port:     os.Getenv("ANAL_DB_PORT"),
 			User:     os.Getenv("DB_USER"),
 			Password: os.Getenv("DB_PASSWORD"),
-			Name:     os.Getenv("DB_NAME"),
+			Name:     os.Getenv("ANAL_OF_DB_NAME"),
 		},
 		Admin: AdminConfig{
 			Secret: os.Getenv("ADMIN_SECRET"),

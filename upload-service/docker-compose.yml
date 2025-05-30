@@ -32,11 +32,11 @@ services:
       - postgres
       - redis
     environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
+      UPL_DB_HOST: postgres
+      UPL_DB_PORT: 5432
       DB_USER: upload_user
       DB_PASSWORD: upload_pass
-      DB_NAME: upload_db
+      UPL_OF_DB_NAME: upload_db
       REDIS_ADDR: redis:6379
       SERVER_PORT: 8081
 

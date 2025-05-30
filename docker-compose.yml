@@ -1,18 +1,34 @@
 version: '3.9'
 
 services:
-  postgres:
+  auth_postgres:
     image: postgres:17
     container_name: auth-postgres
     restart: always
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_DB: ${AUTH_OF_DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata_auth:/var/lib/postgresql/data
+      - ./init/init_auth.sql:/docker-entrypoint-initdb.d/init_auth.sql:ro
+    networks:
+      - app-net
+
+  anal_postgres:
+    image: postgres:17
+    container_name: anal-postgres
+    restart: always
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: ${ANAL_OF_DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata_anal:/var/lib/postgresql/data
       - ./init/init_auth.sql:/docker-entrypoint-initdb.d/init_auth.sql:ro
     networks:
       - app-net
@@ -33,7 +49,7 @@ services:
     container_name: auth-service
     restart: on-failure
     depends_on:
-      - postgres
+      - auth_postgres
       - redis
     ports:
       - "8080:8080"
@@ -47,4 +63,5 @@ networks:
     driver: bridge
 
 volumes:
-  pgdata:
+  pgdata_auth:
+  pgdata_anal:

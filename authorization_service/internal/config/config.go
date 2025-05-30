@@ -25,11 +25,11 @@ type Config struct {
 func LoadConfig() *Config {
 	return &Config{
 		DB: &DBConfig{
-			Host:     os.Getenv("DB_HOST"),
-			Port:     os.Getenv("DB_PORT"),
+			Host:     os.Getenv("AUTH_DB_HOST"),
+			Port:     os.Getenv("AUTH_DB_PORT"),
 			User:     os.Getenv("DB_USER"),
 			Password: os.Getenv("DB_PASSWORD"),
-			Name:     os.Getenv("DB_NAME"),
+			Name:     os.Getenv("AUTH_OF_DB_NAME"),
 		},
 		Server: &ServerConfig{
 			Port: os.Getenv("SERVER_PORT"),
