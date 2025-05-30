@@ -1,3 +1,11 @@
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'upload_user') THEN
+    CREATE USER upload_user WITH PASSWORD 'upload_pass';
+  END IF;
+END
+$$;
+
 CREATE TABLE IF NOT EXISTS genres (
     genre_id BIGSERIAL PRIMARY KEY,
     name VARCHAR(80) NOT NULL UNIQUE
