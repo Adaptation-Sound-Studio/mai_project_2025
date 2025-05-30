@@ -13,6 +13,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./init/init_auth.sql:/docker-entrypoint-initdb.d/init_auth.sql:ro
     networks:
       - app-net
 
@@ -27,7 +28,7 @@ services:
 
   auth:
     build:
-      context: .
+      context: ./authorization_service
       dockerfile: Dockerfile
     container_name: auth-service
     restart: on-failure
