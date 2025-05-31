@@ -1,10 +1,13 @@
 package session
 
-type Repository interface {
-	SetSession(sessionID string, userID int64, ttlSeconds int) error
-	GetUserIDBySession(sessionID string) (int64, error)
-	DeleteSession(sessionID string) error
+import (
+	"context"
+	"time"
+)
 
-	SetUserDeletedFlag(userID int64, isDeleted bool) error
-	GetUserDeletedFlag(userID int64) (bool, error)
+type SessionRepository interface {
+	CreateSession(ctx context.Context, sessionID string, data map[string]interface{}, expiration time.Duration) error
+	GetUserIDFromSession(ctx context.Context, sessionID string) (int64, error)
+	UpdateSessionField(ctx context.Context, sessionID, field string, value interface{}) error
+	DeleteSession(ctx context.Context, sessionID string) error
 }

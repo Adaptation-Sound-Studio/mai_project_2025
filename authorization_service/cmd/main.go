@@ -4,35 +4,43 @@ import (
 	"auth_service/internal/app"
 	"auth_service/internal/config"
 	"auth_service/internal/infrastructure/db"
-	"fmt"
+	"auth_service/internal/infrastructure/session"
 	"log"
 	nethttp "net/http"
 	"os"
-
-	"github.com/go-redis/redis/v8"
 )
 
 func main() {
-	cfg := config.LoadConfig()
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 
-	redisAddr := fmt.Sprintf("%s:%s", os.Getenv("REDIS_HOST"), os.Getenv("REDIS_PORT"))
-	redisClient := redis.NewClient(&redis.Options{
-		Addr: redisAddr,
-	})
+	cfg := config.LoadConfig()
+	log.Printf("INFO: Загружена конфигурация: server port=%s, redis addr=%s", cfg.Server.Port, cfg.Redis.Host+":"+cfg.Redis.Port)
+
+	redisClient := session.NewClient(cfg.Redis)
+	log.Println("INFO: Redis клиент инициализирован")
 
 	dbConn, err := db.NewPostgresConnection(cfg.DB)
 	if err != nil {
-		log.Fatalf("Ошибка подключения к базе данных: %v", err)
+		log.Fatalf("FATAL: Ошибка подключения к базе данных: %v", err)
 	}
-	defer dbConn.Close()
+
+	defer func() {
+		if err := dbConn.Close(); err != nil {
+			log.Printf("ERROR: Ошибка закрытия подключения к БД: %v", err)
+		} else {
+			log.Println("INFO: Подключение к базе данных закрыто")
+		}
+	}()
+	log.Println("INFO: Подключение к базе данных успешно")
 
 	router, err := app.BuildRouter(dbConn, redisClient)
 	if err != nil {
-		log.Fatalf("init failed: %v", err)
+		log.Fatalf("FATAL: Ошибка инициализации роутера: %v", err)
 	}
 
-	log.Println("Сервер запущен")
+	log.Println("INFO: Роутер успешно построен")
 	if err := nethttp.ListenAndServe(":"+cfg.Server.Port, router); err != nil {
-		log.Fatalf("Ошибка запуска сервера: %v", err)
+		log.Printf("ERROR: Ошибка запуска сервера: %v", err)
+		os.Exit(1)
 	}
 }

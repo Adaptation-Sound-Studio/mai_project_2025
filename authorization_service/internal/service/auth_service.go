@@ -1,8 +1,8 @@
 package service
 
 import (
+	"auth_service/internal/domain/session"
 	"auth_service/internal/domain/user"
-	"auth_service/internal/infrastructure/session"
 	"context"
 	"database/sql"
 	"errors"
@@ -15,11 +15,11 @@ import (
 
 type AuthService struct {
 	Repo           user.UserRepository
-	SessionManager session.SessionManager
+	SessionManager session.SessionRepository
 	SessionTTL     time.Duration
 }
 
-func NewAuthService(repo user.UserRepository, sm session.SessionManager, ttl time.Duration) *AuthService {
+func NewAuthService(repo user.UserRepository, sm session.SessionRepository, ttl time.Duration) *AuthService {
 	return &AuthService{
 		Repo:           repo,
 		SessionManager: sm,
@@ -52,7 +52,6 @@ func (s *AuthService) RegisterUser(name, login, password string) error {
 	return nil
 }
 
-// LoginUser проверяет логин и пароль, создает сессию и возвращает ID сессии
 func (s *AuthService) LoginUser(ctx context.Context, login, password string) (string, error) {
 	usr, err := s.Repo.GetByLogin(login)
 	if err != nil {
@@ -69,24 +68,20 @@ func (s *AuthService) LoginUser(ctx context.Context, login, password string) (st
 		return "", errors.New("user is deleted")
 	}
 
-	// Проверка пароля
 	err = bcrypt.CompareHashAndPassword([]byte(usr.Pass), []byte(password))
 	if err != nil {
 		log.Printf("Login failed: incorrect password for login %s", login)
 		return "", errors.New("invalid login or password")
 	}
 
-	// Генерация ID сессии
 	sessionID := uuid.NewString()
 
-	// Данные для сессии
 	sessionData := map[string]interface{}{
 		"user_id":    usr.ID,
 		"is_deleted": usr.IsDeleted,
-		"artist_id":  "", // пока пусто, будет обновлено другим сервисом
+		"artist_id":  "",
 	}
 
-	// Создание сессии в Redis с TTL
 	err = s.SessionManager.CreateSession(ctx, sessionID, sessionData, s.SessionTTL)
 	if err != nil {
 		log.Printf("Login failed: error creating session for user %s (ID: %d): %v", login, usr.ID, err)

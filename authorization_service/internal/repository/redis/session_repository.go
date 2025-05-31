@@ -1,4 +1,4 @@
-package session
+package redis
 
 import (
 	"context"
@@ -6,18 +6,20 @@ import (
 	"fmt"
 	"time"
 
+	"auth_service/internal/domain/session"
+
 	"github.com/go-redis/redis/v8"
 )
 
-type RedisSessionManager struct {
+type SessionRepository struct {
 	client *redis.Client
 }
 
-func NewRedisSessionManager(client *redis.Client) *RedisSessionManager {
-	return &RedisSessionManager{client: client}
+func NewSessionRepository(client *redis.Client) session.SessionRepository {
+	return &SessionRepository{client: client}
 }
 
-func (r *RedisSessionManager) CreateSession(ctx context.Context, sessionID string, data map[string]interface{}, expiration time.Duration) error {
+func (r *SessionRepository) CreateSession(ctx context.Context, sessionID string, data map[string]interface{}, expiration time.Duration) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return err
@@ -25,7 +27,7 @@ func (r *RedisSessionManager) CreateSession(ctx context.Context, sessionID strin
 	return r.client.Set(ctx, sessionID, jsonData, expiration).Err()
 }
 
-func (r *RedisSessionManager) UpdateSessionField(ctx context.Context, sessionID, field string, value interface{}) error {
+func (r *SessionRepository) UpdateSessionField(ctx context.Context, sessionID, field string, value interface{}) error {
 	val, err := r.client.Get(ctx, sessionID).Result()
 	if err != nil {
 		return err
@@ -43,10 +45,11 @@ func (r *RedisSessionManager) UpdateSessionField(ctx context.Context, sessionID,
 		return err
 	}
 
+	// Здесь 0 означает отсутствие истечения (TTL сохраняется, если надо — можно сохранять старый TTL)
 	return r.client.Set(ctx, sessionID, jsonData, 0).Err()
 }
 
-func (r *RedisSessionManager) GetUserIDFromSession(ctx context.Context, sessionID string) (int64, error) {
+func (r *SessionRepository) GetUserIDFromSession(ctx context.Context, sessionID string) (int64, error) {
 	val, err := r.client.Get(ctx, sessionID).Result()
 	if err != nil {
 		return 0, err
@@ -72,6 +75,6 @@ func (r *RedisSessionManager) GetUserIDFromSession(ctx context.Context, sessionI
 	}
 }
 
-func (r *RedisSessionManager) DeleteSession(ctx context.Context, sessionID string) error {
+func (r *SessionRepository) DeleteSession(ctx context.Context, sessionID string) error {
 	return r.client.Del(ctx, sessionID).Err()
 }

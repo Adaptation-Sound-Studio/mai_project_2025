@@ -1,8 +1,8 @@
 package app
 
 import (
-	"auth_service/internal/infrastructure/session"
 	"auth_service/internal/repository/postgres"
+	redisrepo "auth_service/internal/repository/redis"
 	"auth_service/internal/service"
 	"auth_service/internal/transport/http/handler"
 	"auth_service/internal/transport/http/router"
@@ -17,24 +17,23 @@ import (
 
 func BuildRouter(dbConn *sql.DB, redisClient *redis.Client) (*mux.Router, error) {
 
-	sessionManager := session.NewRedisSessionManager(redisClient)
+	sessionRepo := redisrepo.NewSessionRepository(redisClient)
+	sessionService := service.NewSessionService(sessionRepo)
 
-	// Инициализация зависимостей
 	userRepo := postgres.NewUserRepository(dbConn)
 
-	authService := service.NewAuthService(userRepo, sessionManager, time.Hour*24)
+	authService := service.NewAuthService(userRepo, sessionService, time.Hour*24)
 	userService := service.NewUserService(userRepo)
 
 	authHandler := handler.NewAuthHandler(authService)
-	userHandler := handler.NewUserHandler(userService, sessionManager)
+	userHandler := handler.NewUserHandler(userService, sessionService)
+	log.Println("INFO: HTTP обработчики (AuthHandler, UserHandler) инициализированы")
 
-	// Создание роутера
 	mux_router := router.NewRouter()
 
-	// Регистрация маршрутов по сущностям
 	router.RegisterAuthRoutes(mux_router, authHandler)
 	router.RegisterUserRoutes(mux_router, userHandler)
+	log.Println("INFO: Маршруты успешно зарегистрированы")
 
-	log.Println("Маршруты успешно зарегистрированы")
 	return mux_router, nil
 }

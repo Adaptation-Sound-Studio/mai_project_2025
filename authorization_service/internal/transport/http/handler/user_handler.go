@@ -2,7 +2,6 @@ package handler
 
 import (
 	"auth_service/internal/domain/user"
-	"auth_service/internal/infrastructure/session"
 	"auth_service/internal/service"
 	"encoding/json"
 	"net/http"
@@ -13,13 +12,13 @@ import (
 
 type UserHandler struct {
 	Service        *service.UserService
-	SessionManager *session.RedisSessionManager
+	SessionService *service.SessionService
 }
 
-func NewUserHandler(service *service.UserService, sessionManager *session.RedisSessionManager) *UserHandler {
+func NewUserHandler(service *service.UserService, sessionService *service.SessionService) *UserHandler {
 	return &UserHandler{
 		Service:        service,
-		SessionManager: sessionManager,
+		SessionService: sessionService,
 	}
 }
 
@@ -95,7 +94,7 @@ func (h *UserHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	}
 	sessionID := cookie.Value
 
-	userID, err := h.SessionManager.GetUserIDFromSession(ctx, sessionID)
+	userID, err := h.SessionService.GetUserIDFromSession(ctx, sessionID)
 
 	if err != nil {
 		http.Error(w, "Сессия не найдена или истекла", http.StatusUnauthorized)
@@ -124,7 +123,7 @@ func (h *UserHandler) UpdateCurrentUser(w http.ResponseWriter, r *http.Request) 
 	}
 	sessionID := cookie.Value
 
-	userID, err := h.SessionManager.GetUserIDFromSession(ctx, sessionID)
+	userID, err := h.SessionService.GetUserIDFromSession(ctx, sessionID)
 
 	if err != nil {
 		http.Error(w, "Сессия не найдена или истекла", http.StatusUnauthorized)
