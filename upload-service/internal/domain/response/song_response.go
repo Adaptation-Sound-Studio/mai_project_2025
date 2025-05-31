@@ -11,7 +11,6 @@ type SongResponse struct {
 	Auditions int64          `json:"auditions"`
 	GenreID   int64          `json:"genre_id"`
 	Date      time.Time      `json:"date"`
-	Link      string         `json:"link"`
 	Artists   []model.Artist `json:"artists"`
 	Album     *model.Album   `json:"album,omitempty"`
 }
@@ -23,7 +22,6 @@ func MapSongToResponse(song *model.Song, artists []model.Artist, album *model.Al
 		Auditions: song.Auditions,
 		GenreID:   song.GenreID,
 		Date:      song.Date,
-		Link:      song.Link,
 		Artists:   artists,
 		Album:     album,
 	}

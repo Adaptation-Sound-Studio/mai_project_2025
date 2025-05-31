@@ -19,7 +19,7 @@ func NewSongRepository(db *sql.DB) song.Repository {
 }
 
 func (r *songRepository) GetAllSongs(ctx context.Context) ([]model.Song, error) {
-	rows, err := r.db.QueryContext(ctx, "SELECT song_id, name, auditions, genre_id, date, link FROM songs ORDER BY date DESC")
+	rows, err := r.db.QueryContext(ctx, "SELECT song_id, name, auditions, genre_id, date FROM songs ORDER BY date DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -28,7 +28,7 @@ func (r *songRepository) GetAllSongs(ctx context.Context) ([]model.Song, error) 
 	var songs []model.Song
 	for rows.Next() {
 		var s model.Song
-		if err := rows.Scan(&s.SongID, &s.Name, &s.Auditions, &s.GenreID, &s.Date, &s.Link); err != nil {
+		if err := rows.Scan(&s.SongID, &s.Name, &s.Auditions, &s.GenreID, &s.Date); err != nil {
 			return nil, err
 		}
 		songs = append(songs, s)
@@ -42,9 +42,9 @@ func (r *songRepository) GetAllSongs(ctx context.Context) ([]model.Song, error) 
 }
 
 func (r *songRepository) GetSongByID(ctx context.Context, id int64) (*model.Song, error) {
-	row := r.db.QueryRowContext(ctx, "SELECT song_id, name, auditions, genre_id, date, link FROM songs WHERE song_id = $1", id)
+	row := r.db.QueryRowContext(ctx, "SELECT song_id, name, auditions, genre_id, date FROM songs WHERE song_id = $1", id)
 	var s model.Song
-	err := row.Scan(&s.SongID, &s.Name, &s.Auditions, &s.GenreID, &s.Date, &s.Link)
+	err := row.Scan(&s.SongID, &s.Name, &s.Auditions, &s.GenreID, &s.Date)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -62,9 +62,10 @@ func (r *songRepository) CreateSongWithArtists(ctx context.Context, song *model.
 
 	var songID int64
 	err = tx.QueryRowContext(ctx,
-		"INSERT INTO songs (name, genre_id, link) VALUES ($1, $2, $3) RETURNING song_id",
-		song.Name, song.GenreID, song.Link,
+		"INSERT INTO songs (name, genre_id) VALUES ($1, $2) RETURNING song_id",
+		song.Name, song.GenreID,
 	).Scan(&songID)
+
 	if err != nil {
 		tx.Rollback()
 		return 0, err
@@ -100,9 +101,10 @@ func (r *songRepository) CreateSongWithArtists(ctx context.Context, song *model.
 
 func (r *songRepository) UpdateSong(ctx context.Context, song *model.Song) error {
 	res, err := r.db.ExecContext(ctx,
-		"UPDATE songs SET name = $1, genre_id = $2, link = $3 WHERE song_id = $4",
-		song.Name, song.GenreID, song.Link, song.SongID,
+		"UPDATE songs SET name = $1, genre_id = $2 WHERE song_id = $3",
+		song.Name, song.GenreID, song.SongID,
 	)
+
 	if err != nil {
 		return err
 	}

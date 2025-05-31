@@ -82,7 +82,6 @@ func (h *SongHandler) CreateSong(w http.ResponseWriter, r *http.Request) {
 	song := &model.Song{
 		Name:    req.Name,
 		GenreID: req.GenreID,
-		Link:    req.Link,
 	}
 
 	if err := h.Service.CreateSong(r.Context(), song, allArtistIDs); err != nil {
@@ -136,7 +135,6 @@ func (h *SongHandler) UpdateSong(w http.ResponseWriter, r *http.Request) {
 		SongID:  songID,
 		Name:    req.Name,
 		GenreID: req.GenreID,
-		Link:    req.Link,
 	}
 
 	if err := h.Service.UpdateSong(r.Context(), song); err != nil {
