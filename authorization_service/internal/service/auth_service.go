@@ -74,12 +74,19 @@ func (s *AuthService) LoginUser(ctx context.Context, login, password string) (st
 		return "", errors.New("invalid login or password")
 	}
 
+	role, err := s.Repo.GetRoleByUserID(usr.ID)
+	if err != nil {
+		log.Printf("Login failed: error fetching role for user %s (ID: %d): %v", login, usr.ID, err)
+		return "", err
+	}
+
 	sessionID := uuid.NewString()
 
 	sessionData := map[string]interface{}{
 		"user_id":    usr.ID,
 		"is_deleted": usr.IsDeleted,
 		"artist_id":  "",
+		"role":       role,
 	}
 
 	err = s.SessionManager.CreateSession(ctx, sessionID, sessionData, s.SessionTTL)

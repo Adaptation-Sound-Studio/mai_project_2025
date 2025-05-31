@@ -35,6 +35,25 @@ func (r *UserRepository) GetByLogin(login string) (*user.User, error) {
 	return u, nil
 }
 
+func (r *UserRepository) GetRoleByUserID(userID int64) (string, error) {
+	var role string
+	query := `
+		SELECT r.role
+		FROM roles r
+		INNER JOIN user_role ur ON ur.role_id = r.role_id
+		WHERE ur.user_id = $1
+		LIMIT 1
+	`
+	err := r.DB.QueryRow(query, userID).Scan(&role)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil
+		}
+		return "", err
+	}
+	return role, nil
+}
+
 func (r *UserRepository) GetByID(id int64) (*user.User, error) {
 	u := &user.User{}
 	query := `SELECT user_id, name, login, password, is_deleted FROM users WHERE user_id = $1 AND is_deleted = false`

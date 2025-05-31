@@ -48,6 +48,25 @@ func (r *SessionRepository) UpdateSessionField(ctx context.Context, sessionID, f
 	return r.client.Set(ctx, sessionID, jsonData, 0).Err()
 }
 
+func (r *SessionRepository) GetSessionField(ctx context.Context, sessionID string, field string) (interface{}, error) {
+	val, err := r.client.Get(ctx, sessionID).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	var sessionData map[string]interface{}
+	if err := json.Unmarshal([]byte(val), &sessionData); err != nil {
+		return nil, err
+	}
+
+	value, ok := sessionData[field]
+	if !ok {
+		return nil, fmt.Errorf("field %q not found in session", field)
+	}
+
+	return value, nil
+}
+
 func (r *SessionRepository) GetUserIDFromSession(ctx context.Context, sessionID string) (int64, error) {
 	val, err := r.client.Get(ctx, sessionID).Result()
 	if err != nil {

@@ -22,6 +22,10 @@ func (s *SessionService) UpdateSessionField(ctx context.Context, sessionID, fiel
 	return s.repo.UpdateSessionField(ctx, sessionID, field, value)
 }
 
+func (s *SessionService) GetSessionField(ctx context.Context, sessionID string, field string) (interface{}, error) {
+	return s.repo.GetSessionField(ctx, sessionID, field)
+}
+
 func (s *SessionService) GetUserIDFromSession(ctx context.Context, sessionID string) (int64, error) {
 	return s.repo.GetUserIDFromSession(ctx, sessionID)
 }
