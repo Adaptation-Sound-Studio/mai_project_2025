@@ -39,7 +39,6 @@ func TestCreateFact_Success(t *testing.T) {
 		UserID:     1,
 		SongID:     2,
 		ArtistID:   4,
-		AlbumID:    3,
 		GenreID:    5,
 		ListenedAt: time.Now(),
 	}
@@ -69,7 +68,7 @@ func TestCreateFact_Failure(t *testing.T) {
 	router.HandleFunc("/facts", handler.CreateFact).Methods("POST")
 
 	req := httptest.NewRequest(http.MethodPost, "/facts", bytes.NewReader([]byte(`{
-		"user_id":1, "song_id":2, "artist_id":4, "album_id":3, "genre_id":5, "listened_at":"2024-05-16T00:00:00Z"
+		"user_id":1, "song_id":2, "artist_id":4,  "genre_id":5, "listened_at":"2024-05-16T00:00:00Z"
 	}`)))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Admin-Key", "admin-secret")

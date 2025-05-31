@@ -57,7 +57,7 @@ func TestGetPopularSongs_Success(t *testing.T) {
 	s := NewSongService(mockRepo)
 
 	expected := []song.PopularSong{
-		{ID: 1, Name: "Hit", Artist: "Artist", Album: "Album", Genre: "Rock", Listens: 1000},
+		{ID: 1, Name: "Hit", Artist: "Artist", Genre: "Rock", Listens: 1000},
 	}
 
 	mockRepo.On("GetPopularSongs", 1).Return(expected, nil)

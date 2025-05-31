@@ -21,7 +21,6 @@ func CleanTables(t *testing.T, db *sql.DB) {
 		"fact_listens",
 		"songs",
 		"artists",
-		"albums",
 		"genres",
 	}
 

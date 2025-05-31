@@ -29,7 +29,6 @@ func TestStoreFact_Success(t *testing.T) {
 		UserID:     101,
 		SongID:     202,
 		ArtistID:   303,
-		AlbumID:    404,
 		GenreID:    505,
 		ListenedAt: time.Now(),
 	}
@@ -51,7 +50,6 @@ func TestStoreFact_Failure(t *testing.T) {
 		UserID:     111,
 		SongID:     222,
 		ArtistID:   333,
-		AlbumID:    444,
 		GenreID:    555,
 		ListenedAt: time.Now(),
 	}

@@ -16,7 +16,6 @@ func TestFactRepo_Insert_Success(t *testing.T) {
 
 	testutils.TestDB.Exec(`INSERT INTO users (user_id, name) VALUES (1, 'User')`)
 	testutils.TestDB.Exec(`INSERT INTO songs (song_id, name) VALUES (1, 'Track')`)
-	testutils.TestDB.Exec(`INSERT INTO albums (album_id, name) VALUES (1, 'Album')`)
 	testutils.TestDB.Exec(`INSERT INTO artists (artist_id, name) VALUES (1, 'Artist')`)
 	testutils.TestDB.Exec(`INSERT INTO genres (genre_id, name) VALUES (1, 'Genre')`)
 
@@ -26,7 +25,6 @@ func TestFactRepo_Insert_Success(t *testing.T) {
 		UserID:     1,
 		SongID:     1,
 		ArtistID:   1,
-		AlbumID:    1,
 		GenreID:    1,
 		ListenedAt: time.Now(),
 	}
@@ -54,7 +52,6 @@ func TestFactRepo_Insert_InvalidFK(t *testing.T) {
 
 	testutils.TestDB.Exec(`INSERT INTO users (user_id, name) VALUES (1, 'User')`)
 	testutils.TestDB.Exec(`INSERT INTO songs (song_id, name) VALUES (1, 'Track')`)
-	testutils.TestDB.Exec(`INSERT INTO albums (album_id, name) VALUES (1, 'Album')`)
 	testutils.TestDB.Exec(`INSERT INTO genres (genre_id, name) VALUES (1, 'Genre')`)
 
 	repo := NewFactRepo(testutils.TestDB)
@@ -63,7 +60,6 @@ func TestFactRepo_Insert_InvalidFK(t *testing.T) {
 		UserID:     1,
 		SongID:     1,
 		ArtistID:   999,
-		AlbumID:    1,
 		GenreID:    1,
 		ListenedAt: time.Now(),
 	}

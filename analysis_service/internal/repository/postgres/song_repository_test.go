@@ -57,16 +57,15 @@ func TestSongRepo_GetPopularSongs(t *testing.T) {
 	}
 	testutils.CleanTables(t, testutils.TestDB)
 	testutils.TestDB.Exec(`INSERT INTO artists (name) VALUES ('Artist1')`)
-	testutils.TestDB.Exec(`INSERT INTO albums (name) VALUES ('Album1')`)
 	testutils.TestDB.Exec(`INSERT INTO genres (name) VALUES ('Rock')`)
 	testutils.TestDB.Exec(`INSERT INTO songs (name) VALUES ('Track1')`)
 
 	testutils.TestDB.Exec(`
-	INSERT INTO fact_listens (user_id, song_id, artist_id, album_id, genre_id, listened_at)
+	INSERT INTO fact_listens (user_id, song_id, artist_id, genre_id, listened_at)
 	VALUES 
-	(1, 1, 1, 1, 1, CURRENT_TIMESTAMP),
-	(1, 1, 1, 1, 1, CURRENT_TIMESTAMP),
-	(1, 1, 1, 1, 1, CURRENT_TIMESTAMP)
+	(1, 1, 1, 1, CURRENT_TIMESTAMP),
+	(1, 1, 1, 1, CURRENT_TIMESTAMP),
+	(1, 1, 1, 1, CURRENT_TIMESTAMP)
 	`)
 
 	repo := NewSongRepo(testutils.TestDB)
@@ -89,13 +88,12 @@ func TestFactListens_Insert_InvalidArtistFK(t *testing.T) {
 	}
 	testutils.CleanTables(t, testutils.TestDB)
 
-	testutils.TestDB.Exec(`INSERT INTO albums (album_id, name) VALUES (1, 'Album')`)
 	testutils.TestDB.Exec(`INSERT INTO genres (genre_id, name) VALUES (1, 'Genre')`)
 	testutils.TestDB.Exec(`INSERT INTO songs (song_id, name) VALUES (1, 'Track')`)
 
 	_, err := testutils.TestDB.Exec(`
-		INSERT INTO fact_listens (user_id, song_id, artist_id, album_id, genre_id)
-		VALUES (1, 1, 999, 1, 1)
+		INSERT INTO fact_listens (user_id, song_id, artist_id, genre_id)
+		VALUES (1, 1, 999, 1)
 	`)
 	if err == nil {
 		t.Fatal("expected foreign key constraint error, got nil")

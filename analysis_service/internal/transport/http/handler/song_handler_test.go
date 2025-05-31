@@ -77,7 +77,7 @@ func TestCreateSong_Failure(t *testing.T) {
 func TestGetPopularSongs_Success(t *testing.T) {
 	mockRepo := &MockSongRepo{}
 	mockRepo.On("GetPopularSongs", 5).Return([]song.PopularSong{
-		{ID: 1, Name: "Top Hit", Artist: "I", Album: "My", Genre: "Pop", Listens: 123},
+		{ID: 1, Name: "Top Hit", Artist: "I", Genre: "Pop", Listens: 123},
 	}, nil)
 
 	service := service.NewSongService(mockRepo)
