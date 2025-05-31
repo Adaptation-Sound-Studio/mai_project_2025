@@ -45,7 +45,6 @@ func (r *SessionRepository) UpdateSessionField(ctx context.Context, sessionID, f
 		return err
 	}
 
-	// Здесь 0 означает отсутствие истечения (TTL сохраняется, если надо — можно сохранять старый TTL)
 	return r.client.Set(ctx, sessionID, jsonData, 0).Err()
 }
 

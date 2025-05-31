@@ -14,7 +14,9 @@ type DBConfig struct {
 }
 
 type RedisConfig struct {
-	Addr string
+	Host     string
+	Port     string
+	Password string
 }
 
 type ServerConfig struct {
@@ -37,7 +39,9 @@ func LoadConfig() *Config {
 			Name:     os.Getenv("UPL_OF_DB_NAME"),
 		},
 		Redis: &RedisConfig{
-			Addr: os.Getenv("REDIS_ADDR"),
+			Host:     os.Getenv("REDIS_HOST"),
+			Port:     os.Getenv("REDIS_PORT"),
+			Password: os.Getenv("REDIS_PASSWORD"),
 		},
 		Server: &ServerConfig{
 			Port: os.Getenv("SERVER_PORT"),

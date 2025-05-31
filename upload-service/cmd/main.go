@@ -23,7 +23,6 @@ func main() {
 	defer db.Close()
 
 	redisClient := redisinfra.NewRedisClient(cfg.Redis)
-	defer redisClient.Close()
 
 	genreRepo := repository.NewGenreRepository(db)
 	artistRepo := repository.NewArtistRepository(db)

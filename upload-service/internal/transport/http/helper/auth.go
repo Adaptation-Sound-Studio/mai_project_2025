@@ -15,12 +15,13 @@ func GetCurrentArtistID(r *http.Request, redisClient *redislib.Client) (int64, e
 		return 0, ErrUnauthorized
 	}
 
-	userID, err := appredis.GetUserID(redisClient, sessionID)
+	userID, err := appredis.GetUserID(redisClient, r.Context(), sessionID)
 	if err != nil {
 		return 0, ErrUnauthorized
 	}
 
-	artistIDStr, err := appredis.GetArtistID(redisClient, userID)
+	userIDStr := strconv.FormatInt(userID, 10)
+	artistIDStr, err := appredis.GetArtistID(redisClient, userIDStr)
 	if err != nil {
 		return 0, ErrForbidden
 	}
@@ -39,15 +40,12 @@ func GetUserID(r *http.Request, redisClient *redislib.Client) (int64, string, er
 		return 0, "", ErrUnauthorized
 	}
 
-	userIDStr, err := appredis.GetUserID(redisClient, sessionID)
+	userID, err := appredis.GetUserID(redisClient, r.Context(), sessionID)
 	if err != nil {
 		return 0, "", ErrUnauthorized
 	}
 
-	userID, err := strconv.ParseInt(userIDStr, 10, 64)
-	if err != nil {
-		return 0, "", ErrInternal
-	}
+	userIDStr := strconv.FormatInt(userID, 10)
 
 	return userID, userIDStr, nil
 }

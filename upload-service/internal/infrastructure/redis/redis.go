@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"upload-service/internal/config"
 
@@ -12,12 +13,35 @@ var ctx = context.Background()
 
 func NewRedisClient(cfg *config.RedisConfig) *redis.Client {
 	return redis.NewClient(&redis.Options{
-		Addr: cfg.Addr,
+		Addr:     cfg.Host + ":" + cfg.Port,
+		Password: cfg.Password,
 	})
 }
 
-func GetUserID(rdb *redis.Client, sessionID string) (string, error) {
-	return rdb.Get(ctx, "session:"+sessionID).Result()
+func GetUserID(rdb *redis.Client, ctx context.Context, sessionID string) (int64, error) {
+	val, err := rdb.Get(ctx, sessionID).Result()
+	if err != nil {
+		return 0, err
+	}
+
+	var sessionData map[string]interface{}
+	if err := json.Unmarshal([]byte(val), &sessionData); err != nil {
+		return 0, err
+	}
+
+	rawID, ok := sessionData["user_id"]
+	if !ok {
+		return 0, fmt.Errorf("user_id не найден в сессии")
+	}
+
+	switch id := rawID.(type) {
+	case float64:
+		return int64(id), nil
+	case int64:
+		return id, nil
+	default:
+		return 0, fmt.Errorf("user_id имеет неподдерживаемый тип: %T", id)
+	}
 }
 
 func SetArtistID(rdb *redis.Client, userID string, artistID int64) error {
