@@ -64,28 +64,38 @@ func (h *SongHandler) CreateSong(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req request.CreateSongRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
+	r.Body = http.MaxBytesReader(w, r.Body, 20<<20)
+
+	if err := r.ParseMultipartForm(20 << 20); err != nil {
+		http.Error(w, "Ошибка парсинга формы: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	artistSet := map[int64]struct{}{currentArtistID: {}}
-	for _, id := range req.ArtistIDs {
-		artistSet[id] = struct{}{}
+	name := r.FormValue("name")
+	genreIDStr := r.FormValue("genre_id")
+	genreID, err := strconv.ParseInt(genreIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Некорректный genre_id", http.StatusBadRequest)
+		return
 	}
-	var allArtistIDs []int64
-	for id := range artistSet {
-		allArtistIDs = append(allArtistIDs, id)
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Не удалось прочитать файл: "+err.Error(), http.StatusBadRequest)
+		return
 	}
+	defer file.Close()
+
+	artistIDs := []int64{currentArtistID}
 
 	song := &model.Song{
-		Name:    req.Name,
-		GenreID: req.GenreID,
+		Name:    name,
+		GenreID: genreID,
 	}
 
-	if err := h.Service.CreateSong(r.Context(), song, allArtistIDs); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	err = h.Service.CreateSong(r.Context(), song, artistIDs, file, header.Filename)
+	if err != nil {
+		http.Error(w, "Ошибка при создании песни: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 

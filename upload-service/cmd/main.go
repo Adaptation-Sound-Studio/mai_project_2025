@@ -6,14 +6,21 @@ import (
 
 	"upload-service/internal/config"
 	dbinfra "upload-service/internal/infrastructure/db"
+	minioinfra "upload-service/internal/infrastructure/minio"
 	redisinfra "upload-service/internal/infrastructure/redis"
 	"upload-service/internal/repository"
 	"upload-service/internal/service"
 	router "upload-service/internal/transport/http"
 	"upload-service/internal/transport/http/handler"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	if err := godotenv.Load(".env"); err != nil {
+		log.Fatalf("Ошибка загрузки .env: %v", err)
+	}
+
 	cfg := config.LoadConfig()
 
 	db, err := dbinfra.NewPostgresConnection(cfg.DB)
@@ -24,6 +31,11 @@ func main() {
 
 	redisClient := redisinfra.NewRedisClient(cfg.Redis)
 
+	minioClient, minioBucket, err := minioinfra.NewMinioClientFromEnv()
+	if err != nil {
+		log.Fatalf("Ошибка подключения к MinIO: %v", err)
+	}
+
 	genreRepo := repository.NewGenreRepository(db)
 	artistRepo := repository.NewArtistRepository(db)
 	songRepo := repository.NewSongRepository(db)
@@ -31,7 +43,7 @@ func main() {
 
 	genreService := service.NewGenreService(genreRepo)
 	artistService := service.NewArtistService(artistRepo)
-	songService := service.NewSongService(songRepo)
+	songService := service.NewSongService(songRepo, minioClient, minioBucket)
 	albumService := service.NewAlbumService(db, albumRepo)
 
 	genreHandler := handler.NewGenreHandler(genreService)

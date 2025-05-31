@@ -5,19 +5,31 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"mime/multipart"
+	"path/filepath"
+	"strings"
+	"time"
 	"upload-service/internal/domain/model"
 	"upload-service/internal/domain/response"
 	"upload-service/internal/domain/song"
+
+	"github.com/minio/minio-go/v7"
 )
 
 var ErrSongNotFound = errors.New("песня не найдена")
 
 type SongService struct {
-	repo song.Repository
+	repo        song.Repository
+	minioClient *minio.Client
+	bucketName  string
 }
 
-func NewSongService(r song.Repository) *SongService {
-	return &SongService{repo: r}
+func NewSongService(r song.Repository, minioClient *minio.Client, bucketName string) *SongService {
+	return &SongService{
+		repo:        r,
+		minioClient: minioClient,
+		bucketName:  bucketName,
+	}
 }
 
 func (s *SongService) GetAllSongs(ctx context.Context) ([]response.SongResponse, error) {
@@ -77,7 +89,7 @@ func (s *SongService) GetSongByID(ctx context.Context, id int64) (*response.Song
 	return &res, nil
 }
 
-func (s *SongService) CreateSong(ctx context.Context, song *model.Song, artistIDs []int64) error {
+func (s *SongService) CreateSong(ctx context.Context, song *model.Song, artistIDs []int64, file multipart.File, filename string) error {
 	if song.Name == "" {
 		return errors.New("название песни не может быть пустым")
 	}
@@ -102,6 +114,19 @@ func (s *SongService) CreateSong(ctx context.Context, song *model.Song, artistID
 	}
 
 	song.Auditions = 0
+
+	// Загрузка файла в MinIO
+	objectName := generateUniqueFilename(filename)
+	_, err = s.minioClient.PutObject(ctx, s.bucketName, objectName, file, -1, minio.PutObjectOptions{
+		ContentType: "audio/mpeg",
+	})
+	if err != nil {
+		log.Printf("Ошибка при загрузке файла в MinIO: %v", err)
+		return err
+	}
+
+	log.Printf("Файл успешно загружен в MinIO: %s", objectName)
+
 	songID, err := s.repo.CreateSongWithArtists(ctx, song, artistIDs)
 	if err != nil {
 		log.Printf("Ошибка при создании песни: %v", err)
@@ -110,6 +135,13 @@ func (s *SongService) CreateSong(ctx context.Context, song *model.Song, artistID
 
 	log.Printf("Песня успешно создана с ID %d", songID)
 	return nil
+}
+
+func generateUniqueFilename(orig string) string {
+	ext := filepath.Ext(orig)
+	base := strings.TrimSuffix(orig, ext)
+	uniquePart := fmt.Sprintf("%d", time.Now().UnixNano())
+	return base + "_" + uniquePart + ext
 }
 
 func (s *SongService) UpdateSong(ctx context.Context, song *model.Song) error {
