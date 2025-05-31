@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/domain/fact"
 	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/service"
@@ -40,7 +39,7 @@ func TestCreateFact_Success(t *testing.T) {
 		SongID:     2,
 		ArtistID:   4,
 		GenreID:    5,
-		ListenedAt: time.Now(),
+		ListenedAt: nil,
 	}
 	body, _ := json.Marshal(payload)
 

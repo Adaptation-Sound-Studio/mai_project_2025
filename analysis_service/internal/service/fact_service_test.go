@@ -3,7 +3,6 @@ package service
 import (
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -30,7 +29,7 @@ func TestStoreFact_Success(t *testing.T) {
 		SongID:     202,
 		ArtistID:   303,
 		GenreID:    505,
-		ListenedAt: time.Now(),
+		ListenedAt: nil,
 	}
 
 	mockRepo.On("Insert", input).Return(nil)
@@ -51,7 +50,7 @@ func TestStoreFact_Failure(t *testing.T) {
 		SongID:     222,
 		ArtistID:   333,
 		GenreID:    555,
-		ListenedAt: time.Now(),
+		ListenedAt: nil,
 	}
 
 	mockRepo.On("Insert", input).Return(errors.New("db error"))
