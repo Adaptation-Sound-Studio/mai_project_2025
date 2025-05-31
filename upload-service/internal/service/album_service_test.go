@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
 	"upload-service/internal/domain/model"
 	"upload-service/internal/service"
@@ -177,4 +178,65 @@ func TestCreateAlbum_EmptyGenre(t *testing.T) {
 	id, err := s.CreateAlbum(context.Background(), album, nil)
 	assert.Equal(t, int64(0), id)
 	assert.EqualError(t, err, "не указан жанр альбома")
+}
+
+func TestUpdateAlbum_InvalidID(t *testing.T) {
+	repo := new(MockAlbumRepo)
+	svc := service.NewAlbumService(nil, repo)
+
+	err := svc.UpdateAlbum(context.Background(), &model.Album{
+		AlbumID: 0,
+		Name:    "Test",
+		GenreID: 1,
+	})
+
+	assert.EqualError(t, err, "некорректный ID альбома для обновления")
+}
+
+func TestUpdateAlbum_EmptyName(t *testing.T) {
+	repo := new(MockAlbumRepo)
+	svc := service.NewAlbumService(nil, repo)
+
+	repo.On("GetAlbumByID", mock.Anything, int64(1)).Return(&model.Album{AlbumID: 1}, nil)
+
+	err := svc.UpdateAlbum(context.Background(), &model.Album{
+		AlbumID: 1,
+		Name:    "",
+		GenreID: 1,
+	})
+
+	assert.EqualError(t, err, "название альбома не может быть пустым")
+}
+
+func TestUpdateAlbum_InvalidGenre(t *testing.T) {
+	repo := new(MockAlbumRepo)
+	svc := service.NewAlbumService(nil, repo)
+
+	repo.On("GetAlbumByID", mock.Anything, int64(1)).Return(&model.Album{AlbumID: 1}, nil)
+
+	err := svc.UpdateAlbum(context.Background(), &model.Album{
+		AlbumID: 1,
+		Name:    "Album",
+		GenreID: 0,
+	})
+
+	assert.EqualError(t, err, "не указан жанр альбома")
+}
+
+func TestUpdateAlbum_UpdateError(t *testing.T) {
+	repo := new(MockAlbumRepo)
+	svc := service.NewAlbumService(nil, repo)
+
+	album := &model.Album{
+		AlbumID: 1,
+		Name:    "Test",
+		GenreID: 1,
+	}
+
+	repo.On("GetAlbumByID", mock.Anything, int64(1)).Return(album, nil)
+	repo.On("UpdateAlbum", mock.Anything, album).Return(errors.New("ошибка БД"))
+
+	err := svc.UpdateAlbum(context.Background(), album)
+
+	assert.EqualError(t, err, "ошибка БД")
 }

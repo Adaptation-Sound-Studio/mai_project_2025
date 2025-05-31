@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"upload-service/internal/domain/model"
 
@@ -113,5 +114,91 @@ func TestUpdateArtist_Success(t *testing.T) {
 	err := svc.UpdateArtist(context.Background(), artist)
 
 	require.NoError(t, err)
+	repo.AssertExpectations(t)
+}
+
+func TestUpdateArtist_InvalidID(t *testing.T) {
+	repo := new(MockArtistRepo)
+	svc := NewArtistService(repo)
+
+	err := svc.UpdateArtist(context.Background(), &model.Artist{ArtistID: 0, Name: "X"})
+	assert.EqualError(t, err, "некорректный ID артиста для обновления")
+}
+
+func TestUpdateArtist_ArtistNotFound(t *testing.T) {
+	repo := new(MockArtistRepo)
+	service := NewArtistService(repo)
+
+	artist := &model.Artist{
+		ArtistID: 7,
+		Name:     "New Name",
+	}
+
+	repo.On("GetArtistByID", mock.Anything, int64(7)).
+		Return((*model.Artist)(nil), nil)
+
+	err := service.UpdateArtist(context.Background(), artist)
+
+	require.Error(t, err)
+	assert.Equal(t, ErrArtistNotFound, err)
+
+	repo.AssertExpectations(t)
+}
+
+func TestUpdateArtist_EmptyName(t *testing.T) {
+	repo := new(MockArtistRepo)
+	svc := NewArtistService(repo)
+
+	repo.On("GetArtistByID", mock.Anything, int64(8)).
+		Return(&model.Artist{ArtistID: 8, Name: "Y"}, nil)
+
+	err := svc.UpdateArtist(context.Background(), &model.Artist{ArtistID: 8, Name: ""})
+	assert.EqualError(t, err, "имя артиста не может быть пустым")
+}
+
+func TestUpdateArtist_RepoUpdateError(t *testing.T) {
+	repo := new(MockArtistRepo)
+	svc := NewArtistService(repo)
+
+	repo.On("GetArtistByID", mock.Anything, int64(9)).
+		Return(&model.Artist{ArtistID: 9, Name: "Old"}, nil)
+
+	repo.On("UpdateArtist", mock.Anything, &model.Artist{ArtistID: 9, Name: "New"}).
+		Return(errors.New("update failed"))
+
+	err := svc.UpdateArtist(context.Background(), &model.Artist{ArtistID: 9, Name: "New"})
+	assert.EqualError(t, err, "update failed")
+}
+
+func TestGetArtistByID_InvalidID(t *testing.T) {
+	repo := new(MockArtistRepo)
+	svc := NewArtistService(repo)
+
+	_, err := svc.GetArtistByID(context.Background(), 0)
+
+	assert.EqualError(t, err, "некорректный ID артиста")
+}
+
+func TestGetArtistByID_GetArtistError(t *testing.T) {
+	repo := new(MockArtistRepo)
+	svc := NewArtistService(repo)
+
+	repo.On("GetArtistByID", mock.Anything, int64(1)).
+		Return((*model.Artist)(nil), errors.New("db error"))
+
+	_, err := svc.GetArtistByID(context.Background(), 1)
+	assert.EqualError(t, err, "db error")
+	repo.AssertExpectations(t)
+}
+
+func TestGetArtistByID_ArtistNotFound(t *testing.T) {
+	repo := new(MockArtistRepo)
+	svc := NewArtistService(repo)
+
+	repo.On("GetArtistByID", mock.Anything, int64(1)).
+		Return((*model.Artist)(nil), nil)
+
+	_, err := svc.GetArtistByID(context.Background(), 1)
+	assert.Equal(t, ErrArtistNotFound, err)
 	repo.AssertExpectations(t)
 }
