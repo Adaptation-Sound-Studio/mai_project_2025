@@ -5,6 +5,7 @@ import (
 	redisrepo "auth_service/internal/repository/redis"
 	"auth_service/internal/service"
 	"auth_service/internal/transport/http/handler"
+	"auth_service/internal/transport/http/middleware"
 	"auth_service/internal/transport/http/router"
 	"database/sql"
 	"time"
@@ -32,7 +33,8 @@ func BuildRouter(dbConn *sql.DB, redisClient *redis.Client) (*mux.Router, error)
 	mux_router := router.NewRouter()
 
 	router.RegisterAuthRoutes(mux_router, authHandler)
-	router.RegisterUserRoutes(mux_router, userHandler)
+	authMiddleware := middleware.AuthMiddleware(sessionService)
+	router.RegisterUserRoutes(mux_router, userHandler, authMiddleware)
 	log.Println("INFO: Маршруты успешно зарегистрированы")
 
 	return mux_router, nil
