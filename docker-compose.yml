@@ -152,11 +152,12 @@ services:
     build:
       context: ./upload-service
       dockerfile: Dockerfile 
-    container_name: upload_servic
+    container_name: upload_service
     restart: on-failure
     depends_on:
       - upl_postgres
       - redis
+      - minio
     ports:
       - "8082:8082"
     env_file:

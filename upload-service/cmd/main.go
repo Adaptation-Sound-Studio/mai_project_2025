@@ -12,15 +12,9 @@ import (
 	"upload-service/internal/service"
 	router "upload-service/internal/transport/http"
 	"upload-service/internal/transport/http/handler"
-
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	if err := godotenv.Load(".env"); err != nil {
-		log.Fatalf("Ошибка загрузки .env: %v", err)
-	}
-
 	cfg := config.LoadConfig()
 
 	db, err := dbinfra.NewPostgresConnection(cfg.DB)
