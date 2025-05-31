@@ -17,7 +17,7 @@ func NewFactRepo(db *sql.DB) *FactRepo {
 func (r *FactRepo) Insert(f *fact.ListenFact) error {
 	_, err := r.DB.Exec(`
 		INSERT INTO fact_listens (user_id, song_id, artist_id, genre_id, listened_at)
-		VALUES ($1, $2, $3, $4, $5)
+		VALUES ($1, $2, $3, $4, COALESCE($5, CURRENT_TIMESTAMP))
 	`, f.UserID, f.SongID, f.ArtistID, f.GenreID, f.ListenedAt)
 	return err
 }

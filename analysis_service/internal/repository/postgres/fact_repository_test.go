@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"testing"
-	"time"
 
 	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/domain/fact"
 	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/testutils"
@@ -26,7 +25,7 @@ func TestFactRepo_Insert_Success(t *testing.T) {
 		SongID:     1,
 		ArtistID:   1,
 		GenreID:    1,
-		ListenedAt: time.Now(),
+		ListenedAt: nil,
 	}
 
 	err := repo.Insert(fact)
@@ -61,7 +60,7 @@ func TestFactRepo_Insert_InvalidFK(t *testing.T) {
 		SongID:     1,
 		ArtistID:   999,
 		GenreID:    1,
-		ListenedAt: time.Now(),
+		ListenedAt: nil,
 	}
 
 	err := repo.Insert(fact)
