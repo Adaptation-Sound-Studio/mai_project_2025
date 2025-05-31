@@ -89,10 +89,10 @@ func (r *albumRepository) UpdateAlbum(ctx context.Context, album *model.Album) e
 
 func (r *albumRepository) GetSongsByAlbumID(ctx context.Context, albumID int64) ([]model.Song, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT s.song_id, s.name, s.auditions, s.genre_id, s.date, s.link
-		 FROM songs s
-		 JOIN song_album sa ON s.song_id = sa.song_id
-		 WHERE sa.album_id = $1`, albumID)
+		`SELECT s.song_id, s.name, s.auditions, s.genre_id, s.date
+	 	FROM songs s
+	 	JOIN song_album sa ON s.song_id = sa.song_id
+	 	WHERE sa.album_id = $1`, albumID)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (r *albumRepository) GetSongsByAlbumID(ctx context.Context, albumID int64) 
 	var songs []model.Song
 	for rows.Next() {
 		var s model.Song
-		if err := rows.Scan(&s.SongID, &s.Name, &s.Auditions, &s.GenreID, &s.Date, &s.Link); err != nil {
+		if err := rows.Scan(&s.SongID, &s.Name, &s.Auditions, &s.GenreID, &s.Date); err != nil {
 			return nil, err
 		}
 		songs = append(songs, s)

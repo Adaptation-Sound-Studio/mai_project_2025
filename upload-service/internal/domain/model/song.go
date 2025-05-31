@@ -8,5 +8,4 @@ type Song struct {
 	Auditions int64     `json:"auditions"`
 	GenreID   int64     `json:"genre_id"`
 	Date      time.Time `json:"date"`
-	Link      string    `json:"link"`
 }

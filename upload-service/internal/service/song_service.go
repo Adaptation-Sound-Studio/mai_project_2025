@@ -84,9 +84,6 @@ func (s *SongService) CreateSong(ctx context.Context, song *model.Song, artistID
 	if song.GenreID <= 0 {
 		return errors.New("указан некорректный жанр")
 	}
-	if song.Link == "" {
-		return errors.New("ссылка на песню не может быть пустой")
-	}
 	if len(artistIDs) == 0 {
 		return errors.New("нужно указать хотя бы одного артиста")
 	}
@@ -134,9 +131,6 @@ func (s *SongService) UpdateSong(ctx context.Context, song *model.Song) error {
 	}
 	if song.GenreID <= 0 {
 		return errors.New("указан некорректный жанр")
-	}
-	if song.Link == "" {
-		return errors.New("ссылка на песню не может быть пустой")
 	}
 
 	if err := s.repo.UpdateSong(ctx, song); err != nil {

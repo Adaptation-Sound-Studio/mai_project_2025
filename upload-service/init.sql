@@ -16,7 +16,6 @@ CREATE TABLE IF NOT EXISTS songs (
     auditions BIGINT NOT NULL DEFAULT 0,
     genre_id BIGINT NOT NULL,
     date DATE NOT NULL DEFAULT CURRENT_DATE,
-    link VARCHAR(300) NOT NULL,
     CONSTRAINT fk_songs_genre FOREIGN KEY (genre_id) REFERENCES genres(genre_id)
 );
 
