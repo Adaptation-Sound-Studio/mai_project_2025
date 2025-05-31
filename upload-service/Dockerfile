@@ -16,5 +16,6 @@ RUN apk add --no-cache ca-certificates
 WORKDIR /app
 COPY --from=builder /app/upload-service /app/upload-service
 
-EXPOSE 8081
-ENTRYPOINT ["/app/upload-service"]
+EXPOSE 8082
+
+ENTRYPOINT ["./upload-service"]

@@ -73,6 +73,22 @@ services:
     networks:
       - app-net
 
+  upl_postgres:
+    image: postgres:17
+    container_name: upl-postgres
+    restart: always
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: ${UPL_OF_DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata_upl:/var/lib/postgresql/data
+      - ./init/init_upl.sql:/docker-entrypoint-initdb.d/init_upl.sql:ro
+    networks:
+      - app-net
+
   redis:
     image: redis:7-alpine
     container_name: auth-redis
@@ -116,6 +132,22 @@ services:
     networks:
       - app-net
 
+  upload:
+    build:
+      context: ./upload-service
+      dockerfile: Dockerfile 
+    container_name: upload_servic
+    restart: on-failure
+    depends_on:
+      - upl_postgres
+      - redis
+    ports:
+      - "8082:8082"
+    env_file:
+      - .env
+    networks:
+      - app-net
+
 networks:
   app-net:
     driver: bridge
@@ -123,3 +155,4 @@ networks:
 volumes:
   pgdata_auth:
   pgdata_anal:
+  pgdata_upl:

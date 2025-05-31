@@ -4,8 +4,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/joho/godotenv"
-
 	"upload-service/internal/config"
 	dbinfra "upload-service/internal/infrastructure/db"
 	redisinfra "upload-service/internal/infrastructure/redis"
@@ -16,10 +14,6 @@ import (
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Println("Файл .env не найден — используем переменные окружения")
-	}
-
 	cfg := config.LoadConfig()
 
 	db, err := dbinfra.NewPostgresConnection(cfg.DB)
@@ -54,10 +48,7 @@ func main() {
 		redisClient,
 	)
 
-	port := cfg.Server.Port
-	if port == "" {
-		port = "8080"
-	}
+	port := "8082"
 	log.Printf("Сервер запущен на порту %s", port)
 	if err := http.ListenAndServe(":"+port, router); err != nil {
 		log.Fatalf("Ошибка запуска HTTP-сервера: %v", err)
