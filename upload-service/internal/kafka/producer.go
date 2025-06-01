@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"os"
 
-	"upload-service/internal/domain/event"
-
 	"github.com/segmentio/kafka-go"
 )
 
@@ -49,20 +47,6 @@ func NewProducer(brokers []string, topic string) (*Producer, error) {
 
 func (p *Producer) Close() error {
 	return p.writer.Close()
-}
-
-func (p *Producer) SendListenFact(fact event.ListenFact) error {
-	data, err := json.Marshal(fact)
-	if err != nil {
-		return err
-	}
-
-	msg := kafka.Message{
-		Key:   []byte(fmt.Sprintf("%d", fact.UserID)),
-		Value: data,
-	}
-
-	return p.writer.WriteMessages(context.Background(), msg)
 }
 
 func (p *Producer) SendWrappedEvent(eventType string, payload interface{}) error {

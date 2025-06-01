@@ -253,7 +253,7 @@ func (h *SongHandler) StreamSongByID(w http.ResponseWriter, r *http.Request) {
 					ListenedAt: &now,
 				}
 
-				err = h.KafkaProducer.SendListenFact(fact)
+				err = h.KafkaProducer.SendWrappedEvent("listen_fact", fact)
 				if err != nil {
 					log.Printf("Kafka send error: %v", err)
 				}
