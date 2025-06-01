@@ -26,7 +26,16 @@ func main() {
 	FactRepo := postgres.NewFactRepo(dbConn)
 	FactService := service.NewFactService(FactRepo)
 
-	consumer := kafka.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.Topic, FactService)
+	ArtistRepo := postgres.NewArtistRepo(dbConn)
+	ArtistService := service.NewArtistService(ArtistRepo)
+
+	SongRepo := postgres.NewSongRepo(dbConn)
+	SongService := service.NewSongService(SongRepo)
+
+	GenreRepo := postgres.NewGenreRepo(dbConn)
+	GenreService := service.NewGenreService(GenreRepo)
+
+	consumer := kafka.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.Topic, FactService, ArtistService, SongService, GenreService)
 	go consumer.Start(context.Background())
 
 	router := http.NewRouter(dbConn, cfg.Admin.Secret)
