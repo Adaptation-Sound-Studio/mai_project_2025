@@ -11,4 +11,5 @@ type SessionRepository interface {
 	GetSessionField(ctx context.Context, sessionID string, field string) (interface{}, error)
 	UpdateSessionField(ctx context.Context, sessionID, field string, value interface{}) error
 	DeleteSession(ctx context.Context, sessionID string) error
+	DeleteSessionsByUserID(ctx context.Context, userID int64) error
 }

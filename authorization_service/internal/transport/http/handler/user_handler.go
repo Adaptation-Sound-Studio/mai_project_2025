@@ -38,6 +38,22 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(user)
 }
 
+func (h *UserHandler) SoftDeleteUserByID(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.ParseInt(vars["user_id"], 10, 64)
+	if err != nil {
+		http.Error(w, "Неверный user_id", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.Service.SoftDeleteUser(id); err != nil {
+		http.Error(w, "Ошибка при soft удалении", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.ParseInt(vars["user_id"], 10, 64)

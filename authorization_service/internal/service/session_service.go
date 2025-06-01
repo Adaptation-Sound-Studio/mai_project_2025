@@ -33,3 +33,7 @@ func (s *SessionService) GetUserIDFromSession(ctx context.Context, sessionID str
 func (s *SessionService) DeleteSession(ctx context.Context, sessionID string) error {
 	return s.repo.DeleteSession(ctx, sessionID)
 }
+
+func (s *SessionService) DeleteUserSessions(ctx context.Context, userID int64) error {
+	return s.repo.DeleteSessionsByUserID(ctx, userID)
+}

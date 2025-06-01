@@ -24,8 +24,8 @@ func BuildRouter(dbConn *sql.DB, redisClient *redis.Client) (*mux.Router, error)
 
 	userRepo := postgres.NewUserRepository(dbConn)
 
-	authService := service.NewAuthService(userRepo, sessionService, time.Hour*24)
-	userService := service.NewUserService(userRepo)
+	authService := service.NewAuthService(userRepo, sessionRepo, time.Hour*24)
+	userService := service.NewUserService(userRepo, sessionService)
 
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userService, sessionService)

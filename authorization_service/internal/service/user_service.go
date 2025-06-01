@@ -2,16 +2,23 @@ package service
 
 import (
 	"auth_service/internal/domain/user"
+	"context"
+	"fmt"
+	"log"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
 type UserService struct {
-	Repo user.UserRepository
+	Repo           user.UserRepository
+	SessionService *SessionService
 }
 
-func NewUserService(repo user.UserRepository) *UserService {
-	return &UserService{Repo: repo}
+func NewUserService(repo user.UserRepository, sessionService *SessionService) *UserService {
+	return &UserService{
+		Repo:           repo,
+		SessionService: sessionService,
+	}
 }
 
 func (s *UserService) CreateUser(user *user.User) error {
@@ -21,6 +28,28 @@ func (s *UserService) CreateUser(user *user.User) error {
 	}
 	user.Pass = string(hashedPass)
 	return s.Repo.Create(user)
+}
+
+func (s *UserService) SoftDeleteUser(userID int64) error {
+	user, err := s.Repo.GetByID(userID)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return fmt.Errorf("user not found")
+	}
+
+	user.IsDeleted = true
+	err = s.Repo.Update(user)
+	if err != nil {
+		return err
+	}
+
+	if err := s.SessionService.DeleteUserSessions(context.Background(), userID); err != nil {
+		log.Printf("warning: failed to delete sessions for user %d: %v", userID, err)
+	}
+
+	return nil
 }
 
 func (s *UserService) GetUserByID(id int64) (*user.User, error) {
