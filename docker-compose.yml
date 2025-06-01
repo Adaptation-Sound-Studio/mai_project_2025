@@ -72,6 +72,7 @@ services:
 
     volumes:
       - ./analysis_service/certs:/etc/kafka/secrets
+      - ./upload-service/certs:/etc/kafka/secrets
     depends_on:
       - zookeeper
     networks:
@@ -174,16 +175,19 @@ services:
     build:
       context: ./upload-service
       dockerfile: Dockerfile 
-    container_name: upload_service
+    container_name: upload-service
     restart: on-failure
     depends_on:
       - upl_postgres
       - redis
+      - kafka
       - minio
     ports:
       - "8082:8082"
     env_file:
       - .env
+    volumes:
+    - ./upload-service/certs:/certs:ro
     networks:
       - app-net
 

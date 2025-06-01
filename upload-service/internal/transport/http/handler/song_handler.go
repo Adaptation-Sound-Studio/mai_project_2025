@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -202,7 +203,14 @@ func (h *SongHandler) StreamSongByID(w http.ResponseWriter, r *http.Request) {
 	}
 	defer object.Close()
 
+	// Получим размер файла, чтобы выставить заголовок Content-Length
+	stat, err := object.Stat()
+	if err == nil {
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", stat.Size))
+	}
+
 	w.Header().Set("Content-Type", "audio/mpeg")
+	w.Header().Set("Accept-Ranges", "bytes")
 	w.WriteHeader(http.StatusOK)
 
 	const listenThreshold = 128 * 1024
@@ -226,19 +234,19 @@ func (h *SongHandler) StreamSongByID(w http.ResponseWriter, r *http.Request) {
 
 				artists, err := h.Service.GetArtistsBySongID(ctx, songID)
 				if err != nil || len(artists) == 0 {
-					break
+					continue
 				}
 				artistID := artists[0].ArtistID
 
 				currentArtistID, err := auth.GetCurrentArtistID(r, h.RedisClient)
 				if err == nil && currentArtistID == artistID {
 					counted = true
-					break
+					continue
 				}
 
 				album, err := h.Service.GetAlbumBySongID(ctx, songID)
 				if err != nil {
-					break
+					continue
 				}
 
 				fact := model.ListenFact{
@@ -250,8 +258,7 @@ func (h *SongHandler) StreamSongByID(w http.ResponseWriter, r *http.Request) {
 					ListenedAt: time.Now(),
 				}
 
-				err = h.KafkaProducer.SendListenFact(fact)
-				if err != nil {
+				if err := h.KafkaProducer.SendListenFact(fact); err != nil {
 					log.Printf("Kafka send error: %v", err)
 				}
 				counted = true
