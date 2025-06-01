@@ -244,12 +244,13 @@ func (h *SongHandler) StreamSongByID(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 
+				now := time.Now()
 				fact := event.ListenFact{
 					UserID:     userID,
 					SongID:     songID,
 					ArtistID:   artistID,
 					GenreID:    song.GenreID,
-					ListenedAt: time.Now(),
+					ListenedAt: &now,
 				}
 
 				err = h.KafkaProducer.SendListenFact(fact)
