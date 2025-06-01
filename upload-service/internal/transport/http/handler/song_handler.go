@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -203,7 +204,13 @@ func (h *SongHandler) StreamSongByID(w http.ResponseWriter, r *http.Request) {
 	}
 	defer object.Close()
 
+	stat, err := object.Stat()
+	if err == nil {
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", stat.Size))
+	}
+
 	w.Header().Set("Content-Type", "audio/mpeg")
+	w.Header().Set("Accept-Ranges", "bytes")
 	w.WriteHeader(http.StatusOK)
 
 	const listenThreshold = 128 * 1024
@@ -234,19 +241,13 @@ func (h *SongHandler) StreamSongByID(w http.ResponseWriter, r *http.Request) {
 				currentArtistID, err := auth.GetCurrentArtistID(r, h.RedisClient)
 				if err == nil && currentArtistID == artistID {
 					counted = true
-					break
-				}
-
-				album, err := h.Service.GetAlbumBySongID(ctx, songID)
-				if err != nil {
-					break
+					continue
 				}
 
 				fact := event.ListenFact{
 					UserID:     userID,
 					SongID:     songID,
 					ArtistID:   artistID,
-					AlbumID:    album.AlbumID,
 					GenreID:    song.GenreID,
 					ListenedAt: time.Now(),
 				}
