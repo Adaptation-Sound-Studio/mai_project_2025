@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strings"
 
 	appredis "upload-service/internal/infrastructure/redis"
 
@@ -17,7 +18,7 @@ const roleKey contextKey = "role"
 func RequireAnyRole(redisClient *redis.Client, allowedRoles ...string) func(http.Handler) http.Handler {
 	allowed := make(map[string]bool)
 	for _, role := range allowedRoles {
-		allowed[role] = true
+		allowed[strings.ToLower(strings.TrimSpace(role))] = true
 	}
 
 	return func(next http.Handler) http.Handler {
@@ -38,18 +39,19 @@ func RequireAnyRole(redisClient *redis.Client, allowedRoles ...string) func(http
 
 			// Если роли переданы, проверяем роль
 			if len(allowed) > 0 {
-				role, err := appredis.GetUserRole(redisClient, sessionID)
+				our_role, err := appredis.GetUserRole(redisClient, sessionID)
+				our_role = strings.ToLower(strings.TrimSpace(our_role))
 				if err != nil {
 					http.Error(w, "Не удалось определить роль пользователя", http.StatusForbidden)
 					return
 				}
 
-				if !allowed[role] {
+				if !allowed[our_role] {
 					http.Error(w, "Доступ запрещён", http.StatusForbidden)
 					return
 				}
 
-				ctx := context.WithValue(r.Context(), roleKey, role)
+				ctx := context.WithValue(r.Context(), roleKey, our_role)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}

@@ -1,10 +1,14 @@
 package service
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
+	"strconv"
 	"upload-service/internal/domain/artist"
 	"upload-service/internal/domain/model"
 	"upload-service/internal/domain/response"
@@ -13,11 +17,22 @@ import (
 var ErrArtistNotFound = errors.New("артист не найден")
 
 type ArtistService struct {
-	repo artist.Repository
+	repo        artist.Repository
+	authBaseURL string
+	apiKey      string
 }
 
-func NewArtistService(r artist.Repository) *ArtistService {
-	return &ArtistService{repo: r}
+type roleUpdateRequest struct {
+	UserID int64  `json:"user_id"`
+	Role   string `json:"role"`
+}
+
+func NewArtistService(repo artist.Repository, authBaseURL, apiKey string) *ArtistService {
+	return &ArtistService{
+		repo:        repo,
+		authBaseURL: authBaseURL,
+		apiKey:      apiKey,
+	}
 }
 
 func (s *ArtistService) GetAllArtists(ctx context.Context) ([]model.Artist, error) {
@@ -80,6 +95,36 @@ func (s *ArtistService) RegisterArtist(ctx context.Context, artist *model.Artist
 	}
 
 	log.Printf("Артист успешно зарегистрирован с ID %d", artistID)
+
+	reqBody := roleUpdateRequest{
+		UserID: userID,
+		Role:   "artist",
+	}
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		log.Printf("Ошибка сериализации запроса на обновление роли: %v", err)
+		return artistID, nil
+	}
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/role", s.authBaseURL), bytes.NewBuffer(body))
+	if err != nil {
+		log.Printf("Ошибка создания HTTP-запроса в auth-сервис: %v", err)
+		return artistID, nil
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", s.apiKey)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("Ошибка при выполнении запроса в auth-сервис: %v", err)
+		return artistID, nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("Auth-сервис вернул статус %d при обновлении роли", resp.StatusCode)
+	}
+
 	return artistID, nil
 }
 
@@ -108,4 +153,15 @@ func (s *ArtistService) UpdateArtist(ctx context.Context, artist *model.Artist) 
 
 	log.Printf("Артист с ID %d успешно обновлён", artist.ArtistID)
 	return nil
+}
+
+func (s *ArtistService) GetArtistIDByUserID(ctx context.Context, userID int64) (string, error) {
+	artist, err := s.repo.GetArtistByUserID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	if artist == nil {
+		return "", nil
+	}
+	return strconv.FormatInt(artist.ArtistID, 10), nil
 }

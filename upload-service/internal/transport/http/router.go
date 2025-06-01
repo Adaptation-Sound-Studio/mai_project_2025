@@ -3,6 +3,7 @@ package router
 import (
 	"net/http"
 
+	"upload-service/internal/config"
 	"upload-service/internal/transport/http/handler"
 	"upload-service/internal/transport/http/middleware"
 
@@ -16,6 +17,7 @@ func NewRouter(
 	songHandler *handler.SongHandler,
 	albumHandler *handler.AlbumHandler,
 	redisClient *redis.Client,
+	cfg *config.Config,
 ) *mux.Router {
 
 	r := mux.NewRouter()
@@ -24,6 +26,7 @@ func NewRouter(
 	r.Handle("/genres", middleware.RequireAnyRole(redisClient, "admin")(http.HandlerFunc(genreHandler.CreateGenre))).Methods("POST")
 	r.Handle("/genres/{genre_id}", middleware.RequireAnyRole(redisClient, "admin")(http.HandlerFunc(genreHandler.UpdateGenre))).Methods("PUT")
 
+	r.Handle("/artists/user/{user_id}", middleware.RequireServiceAuth(cfg.APIKey)(http.HandlerFunc(artistHandler.GetArtistIDByUserID))).Methods("GET")
 	r.Handle("/artists", middleware.RequireAnyRole(redisClient)(http.HandlerFunc(artistHandler.GetAllArtists))).Methods("GET")
 	r.Handle("/artists/{artist_id}", middleware.RequireAnyRole(redisClient)(http.HandlerFunc(artistHandler.GetArtistByID))).Methods("GET")
 	r.Handle("/artists/register/me", middleware.RequireAnyRole(redisClient)(http.HandlerFunc(artistHandler.RegisterArtist))).Methods("POST")

@@ -170,3 +170,26 @@ func (h *ArtistHandler) UpdateArtist(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "Артист успешно обновлён"})
 }
+
+func (h *ArtistHandler) GetArtistIDByUserID(w http.ResponseWriter, r *http.Request) {
+	userIDStr := mux.Vars(r)["user_id"]
+
+	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid user_id: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	artistID, err := h.Service.GetArtistIDByUserID(r.Context(), userID)
+	if err != nil {
+		http.Error(w, "error fetching artist ID: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if artistID == "" {
+		http.Error(w, "artist not found for user_id "+userIDStr, http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"artist_id": artistID})
+}

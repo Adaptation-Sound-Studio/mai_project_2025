@@ -44,7 +44,7 @@ func main() {
 	albumRepo := repository.NewAlbumRepository(db)
 
 	genreService := service.NewGenreService(genreRepo)
-	artistService := service.NewArtistService(artistRepo)
+	artistService := service.NewArtistService(artistRepo, cfg.AuthService.URL, cfg.AuthService.APIKey)
 	songService := service.NewSongService(songRepo, minioClient, minioBucket)
 	albumService := service.NewAlbumService(db, albumRepo)
 
@@ -60,6 +60,7 @@ func main() {
 		songHandler,
 		albumHandler,
 		redisClient,
+		cfg,
 	)
 
 	port := "8082"
