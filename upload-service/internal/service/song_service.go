@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"html"
 	"log"
 	"mime/multipart"
 	"path/filepath"
@@ -85,13 +84,8 @@ func (s *SongService) GetSongByID(ctx context.Context, id int64) (*response.Song
 		if err != nil {
 			log.Printf("Ошибка при генерации ссылки на файл %s: %v", song.NameOfMinio, err)
 		} else {
-			url := strings.Replace(
-				presignedURL.String(),
-				"http://minio:9000",
-				"http://localhost:9000",
-				1,
-			)
-			url = html.UnescapeString(url)
+
+			url := presignedURL.String()
 
 			song.URL = url
 		}
