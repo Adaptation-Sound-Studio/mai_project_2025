@@ -28,12 +28,18 @@ type AuthServiceConfig struct {
 	APIKey string
 }
 
+type KafkaConfig struct {
+	Brokers string
+	Topic   string
+}
+
 type Config struct {
 	DB          *DBConfig
 	Redis       *RedisConfig
 	Server      *ServerConfig
 	AuthService *AuthServiceConfig
 	APIKey      string
+	Kafka       *KafkaConfig
 }
 
 func LoadConfig() *Config {
@@ -57,6 +63,10 @@ func LoadConfig() *Config {
 		AuthService: &AuthServiceConfig{
 			URL:    os.Getenv("AUTH_SERVICE_URL"),
 			APIKey: os.Getenv("SERVICE_API_KEY"),
+		},
+		Kafka: &KafkaConfig{
+			Brokers: os.Getenv("KAFKA_BROKERS"),
+			Topic:   os.Getenv("KAFKA_TOPIC"),
 		},
 	}
 }

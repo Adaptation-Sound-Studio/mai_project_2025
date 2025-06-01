@@ -36,6 +36,7 @@ func NewRouter(
 	r.Handle("/songs/{song_id}", middleware.RequireAnyRole(redisClient)(http.HandlerFunc(songHandler.GetSongByID))).Methods("GET")
 	r.Handle("/songs", middleware.RequireAnyRole(redisClient, "artist", "admin")(http.HandlerFunc(songHandler.CreateSong))).Methods("POST")
 	r.Handle("/songs/{song_id}", middleware.RequireAnyRole(redisClient, "artist", "admin")(http.HandlerFunc(songHandler.UpdateSong))).Methods("PUT")
+	r.Handle("/songs/{song_id}/stream", middleware.RequireAnyRole(redisClient)(http.HandlerFunc(songHandler.StreamSongByID))).Methods("GET")
 
 	r.Handle("/albums", middleware.RequireAnyRole(redisClient)(http.HandlerFunc(albumHandler.GetAllAlbums))).Methods("GET")
 	r.Handle("/albums/{album_id}", middleware.RequireAnyRole(redisClient)(http.HandlerFunc(albumHandler.GetAlbumByID))).Methods("GET")

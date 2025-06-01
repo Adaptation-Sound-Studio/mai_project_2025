@@ -209,3 +209,11 @@ func findMissingIDs(input, existing []int64) []int64 {
 func (s *SongService) GetSongArtists(ctx context.Context, songID int64) ([]model.Artist, error) {
 	return s.repo.GetArtistsBySongID(ctx, songID)
 }
+
+func (s *SongService) GetArtistsBySongID(ctx context.Context, songID int64) ([]model.Artist, error) {
+	return s.repo.GetArtistsBySongID(ctx, songID)
+}
+
+func (s *SongService) GetAlbumBySongID(ctx context.Context, songID int64) (*model.Album, error) {
+	return s.repo.GetAlbumBySongID(ctx, songID)
+}

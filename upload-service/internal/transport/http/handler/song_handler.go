@@ -2,13 +2,18 @@ package handler
 
 import (
 	"encoding/json"
+	"io"
+	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
+	minio "github.com/minio/minio-go/v7"
 
 	"upload-service/internal/domain/model"
 	"upload-service/internal/domain/request"
+	"upload-service/internal/kafka"
 	"upload-service/internal/service"
 	auth "upload-service/internal/transport/http/helper"
 
@@ -16,12 +21,21 @@ import (
 )
 
 type SongHandler struct {
-	Service     *service.SongService
-	RedisClient *redislib.Client
+	Service       *service.SongService
+	MinioClient   *minio.Client
+	BucketName    string
+	RedisClient   *redislib.Client
+	KafkaProducer *kafka.Producer
 }
 
-func NewSongHandler(service *service.SongService, redisClient *redislib.Client) *SongHandler {
-	return &SongHandler{Service: service, RedisClient: redisClient}
+func NewSongHandler(service *service.SongService, minioClient *minio.Client, bucketName string, redisClient *redislib.Client, producer *kafka.Producer) *SongHandler {
+	return &SongHandler{
+		Service:       service,
+		MinioClient:   minioClient,
+		BucketName:    bucketName,
+		RedisClient:   redisClient,
+		KafkaProducer: producer,
+	}
 }
 
 func (h *SongHandler) GetAllSongs(w http.ResponseWriter, r *http.Request) {
@@ -55,7 +69,6 @@ func (h *SongHandler) GetSongByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Важно: отключить экранирование HTML символов вроде &
 	w.Header().Set("Content-Type", "application/json")
 	encoder := json.NewEncoder(w)
 	encoder.SetEscapeHTML(false)
@@ -159,4 +172,98 @@ func (h *SongHandler) UpdateSong(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]string{"message": "Песня успешно обновлена"})
+}
+
+func (h *SongHandler) StreamSongByID(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	idStr := mux.Vars(r)["song_id"]
+	songID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || songID <= 0 {
+		http.Error(w, "Некорректный song_id", http.StatusBadRequest)
+		return
+	}
+
+	song, err := h.Service.GetSongByID(ctx, songID)
+	if err != nil {
+		http.Error(w, "Песня не найдена", http.StatusNotFound)
+		return
+	}
+
+	object, err := h.MinioClient.GetObject(
+		ctx,
+		h.BucketName,
+		song.NameOfMinio,
+		minio.GetObjectOptions{},
+	)
+	if err != nil {
+		http.Error(w, "Ошибка при получении файла", http.StatusInternalServerError)
+		return
+	}
+	defer object.Close()
+
+	w.Header().Set("Content-Type", "audio/mpeg")
+	w.WriteHeader(http.StatusOK)
+
+	const listenThreshold = 128 * 1024
+	buffer := make([]byte, 32*1024)
+	var total int64
+	var counted bool
+
+	for {
+		n, err := object.Read(buffer)
+		if n > 0 {
+			total += int64(n)
+			if _, writeErr := w.Write(buffer[:n]); writeErr != nil {
+				break
+			}
+
+			if !counted && total >= listenThreshold {
+				userID, _, err := auth.GetUserID(r, h.RedisClient)
+				if err != nil {
+					userID = 0
+				}
+
+				artists, err := h.Service.GetArtistsBySongID(ctx, songID)
+				if err != nil || len(artists) == 0 {
+					break
+				}
+				artistID := artists[0].ArtistID
+
+				currentArtistID, err := auth.GetCurrentArtistID(r, h.RedisClient)
+				if err == nil && currentArtistID == artistID {
+					counted = true
+					break
+				}
+
+				album, err := h.Service.GetAlbumBySongID(ctx, songID)
+				if err != nil {
+					break
+				}
+
+				fact := model.ListenFact{
+					UserID:     userID,
+					SongID:     songID,
+					ArtistID:   artistID,
+					AlbumID:    album.AlbumID,
+					GenreID:    song.GenreID,
+					ListenedAt: time.Now(),
+				}
+
+				err = h.KafkaProducer.SendListenFact(fact)
+				if err != nil {
+					log.Printf("Kafka send error: %v", err)
+				}
+				counted = true
+			}
+		}
+
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Printf("Ошибка чтения mp3: %v", err)
+			break
+		}
+	}
 }
