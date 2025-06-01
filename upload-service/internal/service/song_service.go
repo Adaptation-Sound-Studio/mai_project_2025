@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
 	"log"
 	"mime/multipart"
 	"path/filepath"
@@ -73,6 +74,29 @@ func (s *SongService) GetSongByID(ctx context.Context, id int64) (*response.Song
 		return nil, ErrSongNotFound
 	}
 
+	if song.NameOfMinio != "" {
+		presignedURL, err := s.minioClient.PresignedGetObject(
+			ctx,
+			s.bucketName,
+			song.NameOfMinio,
+			time.Minute*10,
+			nil,
+		)
+		if err != nil {
+			log.Printf("Ошибка при генерации ссылки на файл %s: %v", song.NameOfMinio, err)
+		} else {
+			url := strings.Replace(
+				presignedURL.String(),
+				"http://minio:9000",
+				"http://localhost:9000",
+				1,
+			)
+			url = html.UnescapeString(url)
+
+			song.URL = url
+		}
+	}
+
 	artists, err := s.repo.GetArtistsBySongID(ctx, song.SongID)
 	if err != nil {
 		log.Printf("Ошибка при получении артистов для песни с ID %d: %v", song.SongID, err)
@@ -115,7 +139,6 @@ func (s *SongService) CreateSong(ctx context.Context, song *model.Song, artistID
 
 	song.Auditions = 0
 
-	// Загрузка файла в MinIO
 	objectName := generateUniqueFilename(filename)
 	_, err = s.minioClient.PutObject(ctx, s.bucketName, objectName, file, -1, minio.PutObjectOptions{
 		ContentType: "audio/mpeg",
@@ -124,6 +147,9 @@ func (s *SongService) CreateSong(ctx context.Context, song *model.Song, artistID
 		log.Printf("Ошибка при загрузке файла в MinIO: %v", err)
 		return err
 	}
+
+	song.NameOfMinio = objectName
+	song.Auditions = 0
 
 	log.Printf("Файл успешно загружен в MinIO: %s", objectName)
 

@@ -54,7 +54,14 @@ func (h *SongHandler) GetSongByID(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Песня не найдена", http.StatusNotFound)
 		return
 	}
-	json.NewEncoder(w).Encode(song)
+
+	// Важно: отключить экранирование HTML символов вроде &
+	w.Header().Set("Content-Type", "application/json")
+	encoder := json.NewEncoder(w)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(song); err != nil {
+		http.Error(w, "Ошибка сериализации ответа", http.StatusInternalServerError)
+	}
 }
 
 func (h *SongHandler) CreateSong(w http.ResponseWriter, r *http.Request) {
@@ -96,11 +103,10 @@ func (h *SongHandler) CreateSong(w http.ResponseWriter, r *http.Request) {
 	err = h.Service.CreateSong(r.Context(), song, artistIDs, file, header.Filename)
 	if err != nil {
 		http.Error(w, "Ошибка при создании песни: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Песня успешно создана"})
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Песня успешно создана"})
+	}
 }
 
 func (h *SongHandler) UpdateSong(w http.ResponseWriter, r *http.Request) {

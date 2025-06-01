@@ -42,9 +42,9 @@ func (r *songRepository) GetAllSongs(ctx context.Context) ([]model.Song, error) 
 }
 
 func (r *songRepository) GetSongByID(ctx context.Context, id int64) (*model.Song, error) {
-	row := r.db.QueryRowContext(ctx, "SELECT song_id, name, auditions, genre_id, date FROM songs WHERE song_id = $1", id)
+	row := r.db.QueryRowContext(ctx, "SELECT song_id, name, name_on_minio, auditions, genre_id, date FROM songs WHERE song_id = $1", id)
 	var s model.Song
-	err := row.Scan(&s.SongID, &s.Name, &s.Auditions, &s.GenreID, &s.Date)
+	err := row.Scan(&s.SongID, &s.Name, &s.NameOfMinio, &s.Auditions, &s.GenreID, &s.Date)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -62,8 +62,8 @@ func (r *songRepository) CreateSongWithArtists(ctx context.Context, song *model.
 
 	var songID int64
 	err = tx.QueryRowContext(ctx,
-		"INSERT INTO songs (name, genre_id) VALUES ($1, $2) RETURNING song_id",
-		song.Name, song.GenreID,
+		"INSERT INTO songs (name, genre_id, name_on_minio) VALUES ($1, $2, $3) RETURNING song_id",
+		song.Name, song.GenreID, song.NameOfMinio,
 	).Scan(&songID)
 
 	if err != nil {

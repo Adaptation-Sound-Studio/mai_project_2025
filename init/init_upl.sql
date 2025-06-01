@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS artists (
 CREATE TABLE IF NOT EXISTS songs (
     song_id BIGSERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
+    name_on_minio VARCHAR(100) NOT NULL,
     auditions BIGINT NOT NULL DEFAULT 0,
     genre_id BIGINT NOT NULL,
     date DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -60,8 +61,8 @@ INSERT INTO artists (name, user_id) VALUES
 ON CONFLICT DO NOTHING;
 
 INSERT INTO songs (name, auditions, genre_id, link) VALUES 
-  ('Song A', 1000, 1, 'https://link-to-song-a.com'),
-  ('Song B', 2000, 2, 'https://link-to-song-b.com')
+  ('Song A', 'Song A_1', 1000, 1, 'https://link-to-song-a.com'),
+  ('Song B', 'Song B_1', 2000, 2, 'https://link-to-song-b.com')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO albums (name, auditions, artist_id, genre_id) VALUES 
