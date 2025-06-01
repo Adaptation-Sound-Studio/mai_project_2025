@@ -6,4 +6,5 @@ type UserRepository interface {
 	GetRoleByUserID(userID int64) (string, error)
 	GetByID(id int64) (*User, error)
 	Update(user *User) error
+	UpdateUserRole(userID int64, role string) error
 }

@@ -107,7 +107,14 @@ func (h *ArtistHandler) RegisterArtist(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := appredis.SetArtistID(h.RedisClient, userIDStr, artistID); err != nil {
+	cookie, err := r.Cookie("session_id")
+	if err != nil {
+		http.Error(w, "missing session cookie", http.StatusUnauthorized)
+		return
+	}
+	sessionID := cookie.Value
+
+	if err := appredis.SetArtistID(h.RedisClient, sessionID, artistID); err != nil {
 		log.Printf("Ошибка при сохранении artist_id %d для user_id %s в Redis: %v", artistID, userIDStr, err)
 		http.Error(w, "Ошибка при сохранении artist_id в Redis", http.StatusInternalServerError)
 		return

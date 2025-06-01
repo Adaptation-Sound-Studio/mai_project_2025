@@ -1,6 +1,7 @@
 package app
 
 import (
+	"auth_service/internal/config"
 	"auth_service/internal/repository/postgres"
 	redisrepo "auth_service/internal/repository/redis"
 	"auth_service/internal/service"
@@ -17,7 +18,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func BuildRouter(dbConn *sql.DB, redisClient *redis.Client) (*mux.Router, error) {
+func BuildRouter(dbConn *sql.DB, redisClient *redis.Client, cfg *config.Config) (*mux.Router, error) {
 
 	sessionRepo := redisrepo.NewSessionRepository(redisClient)
 	sessionService := service.NewSessionService(sessionRepo)
@@ -40,7 +41,10 @@ func BuildRouter(dbConn *sql.DB, redisClient *redis.Client) (*mux.Router, error)
 		return middleware.RoleMiddleware(sessionService, allowedRoles...)
 	}
 
-	router.RegisterUserRoutes(mux_router, userHandler, authMiddleware, roleMiddleware)
+	apiKey := cfg.ServiceApiKey
+	apiKeyMiddleware := middleware.ApiKeyMiddleware(apiKey)
+
+	router.RegisterUserRoutes(mux_router, userHandler, authMiddleware, roleMiddleware, apiKeyMiddleware)
 	log.Println("INFO: Маршруты успешно зарегистрированы")
 
 	return mux_router, nil

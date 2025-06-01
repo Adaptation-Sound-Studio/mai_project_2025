@@ -33,7 +33,7 @@ func main() {
 	}()
 	log.Println("INFO: Подключение к базе данных успешно")
 
-	router, err := app.BuildRouter(dbConn, redisClient)
+	router, err := app.BuildRouter(dbConn, redisClient, cfg)
 	if err != nil {
 		log.Fatalf("FATAL: Ошибка инициализации роутера: %v", err)
 	}

@@ -64,3 +64,14 @@ func (s *UserService) UpdateUser(user *user.User) error {
 	user.Pass = string(hashedPass)
 	return s.Repo.Update(user)
 }
+
+func (s *UserService) UpdateUserRole(userID int64, role string) error {
+	user, err := s.Repo.GetByID(userID)
+	if err != nil {
+		return fmt.Errorf("не удалось получить пользователя: %w", err)
+	}
+	if user == nil {
+		return fmt.Errorf("пользователь с ID %d не найден", userID)
+	}
+	return s.Repo.UpdateUserRole(userID, role)
+}

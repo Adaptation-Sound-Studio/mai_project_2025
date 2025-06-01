@@ -3,6 +3,7 @@ package postgres
 import (
 	"auth_service/internal/domain/user"
 	"database/sql"
+	"fmt"
 )
 
 type UserRepository struct {
@@ -74,5 +75,34 @@ func (r *UserRepository) Update(u *user.User) error {
 		WHERE user_id = $5
 	`
 	_, err := r.DB.Exec(query, u.Name, u.Login, u.Pass, u.IsDeleted, u.ID)
+	return err
+}
+
+func (r *UserRepository) UpdateUserRole(userID int64, role string) error {
+	var roleID int64
+	getRoleIDQuery := `SELECT role_id FROM roles WHERE role = $1`
+	err := r.DB.QueryRow(getRoleIDQuery, role).Scan(&roleID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("role %s not found", role)
+		}
+		return err
+	}
+
+	var urID int64
+	checkQuery := `SELECT ur_id FROM user_role WHERE user_id = $1`
+	err = r.DB.QueryRow(checkQuery, userID).Scan(&urID)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	if err == sql.ErrNoRows {
+		insertQuery := `INSERT INTO user_role (user_id, role_id) VALUES ($1, $2)`
+		_, err = r.DB.Exec(insertQuery, userID, roleID)
+		return err
+	}
+
+	updateQuery := `UPDATE user_role SET role_id = $1 WHERE user_id = $2`
+	_, err = r.DB.Exec(updateQuery, roleID, userID)
 	return err
 }

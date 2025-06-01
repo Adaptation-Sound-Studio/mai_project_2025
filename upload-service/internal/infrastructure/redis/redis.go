@@ -44,8 +44,28 @@ func GetUserID(rdb *redis.Client, ctx context.Context, sessionID string) (int64,
 	}
 }
 
-func SetArtistID(rdb *redis.Client, userID string, artistID int64) error {
-	return rdb.Set(ctx, "artist:"+userID, artistID, 0).Err()
+func SetArtistID(rdb *redis.Client, sessionID string, artistID int64) error {
+	val, err := rdb.Get(ctx, sessionID).Result()
+	if err == redis.Nil {
+		return fmt.Errorf("сессия %s не найдена", sessionID)
+	} else if err != nil {
+		return fmt.Errorf("ошибка при получении сессии: %v", err)
+	}
+
+	var sessionData map[string]interface{}
+	if err := json.Unmarshal([]byte(val), &sessionData); err != nil {
+		return fmt.Errorf("не удалось распарсить сессию: %v", err)
+	}
+
+	sessionData["artist_id"] = artistID
+	sessionData["role"] = "artist"
+
+	updatedVal, err := json.Marshal(sessionData)
+	if err != nil {
+		return fmt.Errorf("ошибка при сериализации сессии: %v", err)
+	}
+
+	return rdb.Set(ctx, sessionID, updatedVal, 0).Err()
 }
 
 func GetArtistID(rdb *redis.Client, userID string) (string, error) {

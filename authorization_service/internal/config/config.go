@@ -24,9 +24,10 @@ type ServerConfig struct {
 }
 
 type Config struct {
-	DB     *DBConfig
-	Redis  *RedisConfig
-	Server *ServerConfig
+	DB            *DBConfig
+	Redis         *RedisConfig
+	Server        *ServerConfig
+	ServiceApiKey string
 }
 
 func LoadConfig() *Config {
@@ -46,6 +47,7 @@ func LoadConfig() *Config {
 		Server: &ServerConfig{
 			Port: os.Getenv("SERVER_PORT"),
 		},
+		ServiceApiKey: os.Getenv("SERVICE_API_KEY"),
 	}
 }
 
