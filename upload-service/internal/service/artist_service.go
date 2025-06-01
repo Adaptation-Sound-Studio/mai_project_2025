@@ -10,8 +10,10 @@ import (
 	"net/http"
 	"strconv"
 	"upload-service/internal/domain/artist"
+	"upload-service/internal/domain/event"
 	"upload-service/internal/domain/model"
 	"upload-service/internal/domain/response"
+	"upload-service/internal/kafka"
 )
 
 var ErrArtistNotFound = errors.New("артист не найден")
@@ -20,6 +22,7 @@ type ArtistService struct {
 	repo        artist.Repository
 	authBaseURL string
 	apiKey      string
+	producer    *kafka.Producer
 }
 
 type roleUpdateRequest struct {
@@ -27,11 +30,12 @@ type roleUpdateRequest struct {
 	Role   string `json:"role"`
 }
 
-func NewArtistService(repo artist.Repository, authBaseURL, apiKey string) *ArtistService {
+func NewArtistService(r artist.Repository, authBaseURL, apiKey string, producer *kafka.Producer) *ArtistService {
 	return &ArtistService{
-		repo:        repo,
+		repo:        r,
 		authBaseURL: authBaseURL,
 		apiKey:      apiKey,
+		producer:    producer,
 	}
 }
 
@@ -123,6 +127,17 @@ func (s *ArtistService) RegisterArtist(ctx context.Context, artist *model.Artist
 
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("Auth-сервис вернул статус %d при обновлении роли", resp.StatusCode)
+	}
+
+	artist.ArtistID = artistID
+	artistEvent := event.ArtistCreatedEvent{
+		ID:   artist.ArtistID,
+		Name: artist.Name,
+	}
+
+	err = s.producer.SendWrappedEvent("artist_created", artistEvent)
+	if err != nil {
+		log.Printf("Ошибка отправки события artist_created: %v", err)
 	}
 
 	return artistID, nil

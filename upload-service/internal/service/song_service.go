@@ -9,9 +9,11 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"upload-service/internal/domain/event"
 	"upload-service/internal/domain/model"
 	"upload-service/internal/domain/response"
 	"upload-service/internal/domain/song"
+	"upload-service/internal/kafka"
 
 	"github.com/minio/minio-go/v7"
 )
@@ -22,13 +24,15 @@ type SongService struct {
 	repo        song.Repository
 	minioClient *minio.Client
 	bucketName  string
+	producer    *kafka.Producer
 }
 
-func NewSongService(r song.Repository, minioClient *minio.Client, bucketName string) *SongService {
+func NewSongService(r song.Repository, minioClient *minio.Client, bucketName string, producer *kafka.Producer) *SongService {
 	return &SongService{
 		repo:        r,
 		minioClient: minioClient,
 		bucketName:  bucketName,
+		producer:    producer,
 	}
 }
 
@@ -151,6 +155,17 @@ func (s *SongService) CreateSong(ctx context.Context, song *model.Song, artistID
 	if err != nil {
 		log.Printf("Ошибка при создании песни: %v", err)
 		return err
+	}
+
+	song.SongID = songID
+	songEvent := event.SongCreatedEvent{
+		ID:   songID,
+		Name: song.Name,
+	}
+
+	err = s.producer.SendWrappedEvent("song_created", songEvent)
+	if err != nil {
+		log.Printf("Ошибка при отправке события song_created: %v", err)
 	}
 
 	log.Printf("Песня успешно создана с ID %d", songID)

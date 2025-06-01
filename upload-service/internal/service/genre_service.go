@@ -4,16 +4,19 @@ import (
 	"context"
 	"errors"
 	"log"
+	"upload-service/internal/domain/event"
 	"upload-service/internal/domain/genre"
 	"upload-service/internal/domain/model"
+	"upload-service/internal/kafka"
 )
 
 type GenreService struct {
-	repo genre.Repository
+	repo     genre.Repository
+	producer *kafka.Producer
 }
 
-func NewGenreService(r genre.Repository) *GenreService {
-	return &GenreService{repo: r}
+func NewGenreService(r genre.Repository, producer *kafka.Producer) *GenreService {
+	return &GenreService{repo: r, producer: producer}
 }
 
 func (s *GenreService) GetAllGenres(ctx context.Context) ([]model.Genre, error) {
@@ -34,6 +37,15 @@ func (s *GenreService) CreateGenre(ctx context.Context, genre *model.Genre) (int
 	if err != nil {
 		log.Printf("Ошибка при создании жанра: %v", err)
 		return 0, err
+	}
+
+	event := event.Genre{
+		ID:   genreID,
+		Name: genre.Name,
+	}
+
+	if err := s.producer.SendWrappedEvent("genre_created", event); err != nil {
+		log.Printf("Ошибка отправки события genre_created: %v", err)
 	}
 
 	log.Printf("Жанр успешно создан с ID %d", genreID)

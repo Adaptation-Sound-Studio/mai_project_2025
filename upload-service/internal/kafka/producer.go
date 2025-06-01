@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"upload-service/internal/domain/model"
+	"upload-service/internal/domain/event"
 
 	"github.com/segmentio/kafka-go"
 )
@@ -51,7 +51,7 @@ func (p *Producer) Close() error {
 	return p.writer.Close()
 }
 
-func (p *Producer) SendListenFact(fact model.ListenFact) error {
+func (p *Producer) SendListenFact(fact event.ListenFact) error {
 	data, err := json.Marshal(fact)
 	if err != nil {
 		return err
@@ -59,6 +59,28 @@ func (p *Producer) SendListenFact(fact model.ListenFact) error {
 
 	msg := kafka.Message{
 		Key:   []byte(fmt.Sprintf("%d", fact.UserID)),
+		Value: data,
+	}
+
+	return p.writer.WriteMessages(context.Background(), msg)
+}
+
+func (p *Producer) SendWrappedEvent(eventType string, payload interface{}) error {
+	wrapped := struct {
+		Type    string      `json:"type"`
+		Payload interface{} `json:"payload"`
+	}{
+		Type:    eventType,
+		Payload: payload,
+	}
+
+	data, err := json.Marshal(wrapped)
+	if err != nil {
+		return err
+	}
+
+	msg := kafka.Message{
+		Key:   []byte(eventType),
 		Value: data,
 	}
 
