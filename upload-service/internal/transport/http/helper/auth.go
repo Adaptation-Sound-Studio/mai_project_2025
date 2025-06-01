@@ -12,13 +12,8 @@ import (
 func GetCurrentArtistID(r *http.Request, redisClient *redislib.Client) (int64, error) {
 	cookie, err := r.Cookie("session_id")
 	sessionID := cookie.Value
-	userID, err := appredis.GetUserID(redisClient, r.Context(), sessionID)
-	if err != nil {
-		return 0, ErrUnauthorized
-	}
 
-	userIDStr := strconv.FormatInt(userID, 10)
-	artistIDStr, err := appredis.GetArtistID(redisClient, userIDStr)
+	artistIDStr, err := appredis.GetArtistID(redisClient, sessionID)
 	if err != nil {
 		return 0, ErrForbidden
 	}
