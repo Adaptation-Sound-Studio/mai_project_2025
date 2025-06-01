@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS genres (
     name VARCHAR(80) NOT NULL UNIQUE
 );
 
-
 CREATE TABLE IF NOT EXISTS artists (
   artist_id BIGSERIAL PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
@@ -20,7 +19,7 @@ CREATE TABLE IF NOT EXISTS songs (
     CONSTRAINT fk_songs_genre FOREIGN KEY (genre_id) REFERENCES genres(genre_id)
 );
 
-CREATE TABLE albums (
+CREATE TABLE IF NOT EXISTS albums (
     album_id BIGSERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     auditions BIGINT NOT NULL DEFAULT 0,
@@ -31,7 +30,7 @@ CREATE TABLE albums (
     CONSTRAINT fk_albums_genre FOREIGN KEY (genre_id) REFERENCES genres(genre_id) 
 );
 
-CREATE TABLE song_album (
+CREATE TABLE IF NOT EXISTS song_album (
     sa_id BIGSERIAL PRIMARY KEY,
     song_id BIGINT NOT NULL,
     album_id BIGINT NOT NULL,
@@ -40,7 +39,7 @@ CREATE TABLE song_album (
     CONSTRAINT uq_song_album UNIQUE (song_id, album_id)
 );
 
-CREATE TABLE song_artist (
+CREATE TABLE IF NOT EXISTS song_artist (
     sa_id BIGSERIAL PRIMARY KEY,
     song_id BIGINT NOT NULL,
     artist_id BIGINT NOT NULL,
@@ -48,6 +47,15 @@ CREATE TABLE song_artist (
     CONSTRAINT fk_song_artist_artist FOREIGN KEY (artist_id) REFERENCES artists(artist_id),
     UNIQUE (song_id, artist_id)
 );
+
+TRUNCATE TABLE 
+  song_album,
+  song_artist,
+  albums,
+  songs,
+  artists,
+  genres
+RESTART IDENTITY CASCADE;
 
 INSERT INTO genres (name) VALUES 
   ('Pop'),
@@ -60,9 +68,9 @@ INSERT INTO artists (name, user_id) VALUES
   ('Artist Two', 22)
 ON CONFLICT DO NOTHING;
 
-INSERT INTO songs (name, auditions, genre_id, link) VALUES 
-  ('Song A', 'Song A_1', 1000, 1, 'https://link-to-song-a.com'),
-  ('Song B', 'Song B_1', 2000, 2, 'https://link-to-song-b.com')
+INSERT INTO songs (name, name_on_minio, auditions, genre_id) VALUES 
+  ('Song A', 'Song A_1', 1000, 1),
+  ('Song B', 'Song B_1', 2000, 2)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO albums (name, auditions, artist_id, genre_id) VALUES 
