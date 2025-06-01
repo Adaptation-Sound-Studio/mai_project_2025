@@ -26,12 +26,12 @@ func NewRouter(
 
 	r.HandleFunc("/artists", artistHandler.GetAllArtists).Methods("GET")
 	r.HandleFunc("/artists/{artist_id}", artistHandler.GetArtistByID).Methods("GET")
-	r.Handle("/artists/register/me", middleware.RequireAnyRole(redisClient, "artist")(http.HandlerFunc(artistHandler.RegisterArtist))).Methods("POST")
+	r.Handle("/artists/register/me", middleware.RequireAnyRole(redisClient)(http.HandlerFunc(artistHandler.RegisterArtist))).Methods("POST")
 	r.Handle("/artists/{artist_id}", middleware.RequireAnyRole(redisClient, "artist", "admin")(http.HandlerFunc(artistHandler.UpdateArtist))).Methods("PUT")
 
 	r.Handle("/songs", middleware.RequireAnyRole(redisClient)(http.HandlerFunc(songHandler.GetAllSongs))).Methods("GET")
 	r.HandleFunc("/songs/{song_id}", songHandler.GetSongByID).Methods("GET")
-	r.Handle("/songs", middleware.RequireAnyRole(redisClient, "artist")(http.HandlerFunc(songHandler.CreateSong))).Methods("POST")
+	r.Handle("/songs", middleware.RequireAnyRole(redisClient)(http.HandlerFunc(songHandler.CreateSong))).Methods("POST")
 	r.Handle("/songs/{song_id}", middleware.RequireAnyRole(redisClient, "artist", "admin")(http.HandlerFunc(songHandler.UpdateSong))).Methods("PUT")
 
 	r.HandleFunc("/albums", albumHandler.GetAllAlbums).Methods("GET")
