@@ -3,11 +3,13 @@ package main
 import (
 	"log"
 	"net/http"
+	"strings"
 
 	"upload-service/internal/config"
 	dbinfra "upload-service/internal/infrastructure/db"
 	minioinfra "upload-service/internal/infrastructure/minio"
 	redisinfra "upload-service/internal/infrastructure/redis"
+	kafkapkg "upload-service/internal/kafka"
 	"upload-service/internal/repository"
 	"upload-service/internal/service"
 	router "upload-service/internal/transport/http"
@@ -30,6 +32,12 @@ func main() {
 		log.Fatalf("Ошибка подключения к MinIO: %v", err)
 	}
 
+	kafkaProducer, err := kafkapkg.NewProducer(strings.Split(cfg.Kafka.Brokers, ","), cfg.Kafka.Topic)
+	if err != nil {
+		log.Fatalf("Ошибка подключения к Kafka: %v", err)
+	}
+	defer kafkaProducer.Close()
+
 	genreRepo := repository.NewGenreRepository(db)
 	artistRepo := repository.NewArtistRepository(db)
 	songRepo := repository.NewSongRepository(db)
@@ -42,7 +50,8 @@ func main() {
 
 	genreHandler := handler.NewGenreHandler(genreService)
 	artistHandler := handler.NewArtistHandler(artistService, redisClient)
-	songHandler := handler.NewSongHandler(songService, redisClient)
+	songHandler := handler.NewSongHandler(songService, minioClient, minioBucket, redisClient, kafkaProducer)
+
 	albumHandler := handler.NewAlbumHandler(albumService, redisClient)
 
 	router := router.NewRouter(
