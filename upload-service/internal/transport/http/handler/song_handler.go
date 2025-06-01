@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 	"github.com/gorilla/mux"
 	minio "github.com/minio/minio-go/v7"
 
+	"upload-service/internal/domain/event"
 	"upload-service/internal/domain/model"
 	"upload-service/internal/domain/request"
 	"upload-service/internal/kafka"
@@ -117,10 +117,10 @@ func (h *SongHandler) CreateSong(w http.ResponseWriter, r *http.Request) {
 	err = h.Service.CreateSong(r.Context(), song, artistIDs, file, header.Filename)
 	if err != nil {
 		http.Error(w, "Ошибка при создании песни: "+err.Error(), http.StatusInternalServerError)
-
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Песня успешно создана"})
 	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Песня успешно создана"})
 }
 
 func (h *SongHandler) UpdateSong(w http.ResponseWriter, r *http.Request) {
@@ -203,14 +203,7 @@ func (h *SongHandler) StreamSongByID(w http.ResponseWriter, r *http.Request) {
 	}
 	defer object.Close()
 
-	// Получим размер файла, чтобы выставить заголовок Content-Length
-	stat, err := object.Stat()
-	if err == nil {
-		w.Header().Set("Content-Length", fmt.Sprintf("%d", stat.Size))
-	}
-
 	w.Header().Set("Content-Type", "audio/mpeg")
-	w.Header().Set("Accept-Ranges", "bytes")
 	w.WriteHeader(http.StatusOK)
 
 	const listenThreshold = 128 * 1024
@@ -234,22 +227,22 @@ func (h *SongHandler) StreamSongByID(w http.ResponseWriter, r *http.Request) {
 
 				artists, err := h.Service.GetArtistsBySongID(ctx, songID)
 				if err != nil || len(artists) == 0 {
-					continue
+					break
 				}
 				artistID := artists[0].ArtistID
 
 				currentArtistID, err := auth.GetCurrentArtistID(r, h.RedisClient)
 				if err == nil && currentArtistID == artistID {
 					counted = true
-					continue
+					break
 				}
 
 				album, err := h.Service.GetAlbumBySongID(ctx, songID)
 				if err != nil {
-					continue
+					break
 				}
 
-				fact := model.ListenFact{
+				fact := event.ListenFact{
 					UserID:     userID,
 					SongID:     songID,
 					ArtistID:   artistID,
@@ -258,7 +251,8 @@ func (h *SongHandler) StreamSongByID(w http.ResponseWriter, r *http.Request) {
 					ListenedAt: time.Now(),
 				}
 
-				if err := h.KafkaProducer.SendListenFact(fact); err != nil {
+				err = h.KafkaProducer.SendListenFact(fact)
+				if err != nil {
 					log.Printf("Kafka send error: %v", err)
 				}
 				counted = true

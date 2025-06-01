@@ -43,15 +43,14 @@ func main() {
 	songRepo := repository.NewSongRepository(db)
 	albumRepo := repository.NewAlbumRepository(db)
 
-	genreService := service.NewGenreService(genreRepo)
-	artistService := service.NewArtistService(artistRepo, cfg.AuthService.URL, cfg.AuthService.APIKey)
-	songService := service.NewSongService(songRepo, minioClient, minioBucket)
+	genreService := service.NewGenreService(genreRepo, kafkaProducer)
+	artistService := service.NewArtistService(artistRepo, cfg.AuthService.URL, cfg.AuthService.APIKey, kafkaProducer)
+	songService := service.NewSongService(songRepo, minioClient, minioBucket, kafkaProducer)
 	albumService := service.NewAlbumService(db, albumRepo)
 
 	genreHandler := handler.NewGenreHandler(genreService)
 	artistHandler := handler.NewArtistHandler(artistService, redisClient)
 	songHandler := handler.NewSongHandler(songService, minioClient, minioBucket, redisClient, kafkaProducer)
-
 	albumHandler := handler.NewAlbumHandler(albumService, redisClient)
 
 	router := router.NewRouter(
