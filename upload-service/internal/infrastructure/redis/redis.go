@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"upload-service/internal/config"
 
 	"github.com/go-redis/redis/v8"
@@ -45,7 +44,7 @@ func GetUserID(rdb *redis.Client, ctx context.Context, sessionID string) (int64,
 	}
 }
 
-func SetArtistID(rdb *redis.Client, sessionID string, artistID int64) error {
+func SetArtistID(rdb *redis.Client, sessionID string, artistID string) error {
 	val, err := rdb.Get(ctx, sessionID).Result()
 	if err == redis.Nil {
 		return fmt.Errorf("сессия %s не найдена", sessionID)
@@ -79,13 +78,13 @@ func GetArtistID(rdb *redis.Client, sessionID string) (string, error) {
 	}
 
 	var sessionData struct {
-		ArtistID int64 `json:"artist_id"`
+		ArtistID string `json:"artist_id"`
 	}
 	if err := json.Unmarshal([]byte(val), &sessionData); err != nil {
 		return "", fmt.Errorf("не удалось распарсить сессию: %v", err)
 	}
 
-	return strconv.FormatInt(sessionData.ArtistID, 10), nil
+	return sessionData.ArtistID, nil
 }
 
 func GetUserRole(rdb *redis.Client, sessionID string) (string, error) {

@@ -203,7 +203,6 @@ func (h *SongHandler) StreamSongByID(w http.ResponseWriter, r *http.Request) {
 	}
 	defer object.Close()
 
-	// Получим размер файла, чтобы выставить заголовок Content-Length
 	stat, err := object.Stat()
 	if err == nil {
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", stat.Size))

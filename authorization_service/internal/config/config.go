@@ -23,11 +23,17 @@ type ServerConfig struct {
 	Port string
 }
 
+type UplServiceConfig struct {
+	URL    string
+	APIKey string
+}
+
 type Config struct {
 	DB            *DBConfig
 	Redis         *RedisConfig
 	Server        *ServerConfig
 	ServiceApiKey string
+	UplService    *UplServiceConfig
 }
 
 func LoadConfig() *Config {
@@ -48,6 +54,10 @@ func LoadConfig() *Config {
 			Port: os.Getenv("SERVER_PORT"),
 		},
 		ServiceApiKey: os.Getenv("SERVICE_API_KEY"),
+		UplService: &UplServiceConfig{
+			URL:    os.Getenv("UPL_SERVICE_URL"),
+			APIKey: os.Getenv("SERVICE_API_KEY"),
+		},
 	}
 }
 

@@ -22,3 +22,6 @@ CREATE TABLE IF NOT EXISTS user_role (
         REFERENCES roles (role_id) ON DELETE CASCADE,
     CONSTRAINT uq_user_role UNIQUE (user_id, role_id)
 );
+
+INSERT INTO roles (role) VALUES ('artist');
+INSERT INTO roles (role) VALUES ('admin');

@@ -25,7 +25,7 @@ func BuildRouter(dbConn *sql.DB, redisClient *redis.Client, cfg *config.Config) 
 
 	userRepo := postgres.NewUserRepository(dbConn)
 
-	authService := service.NewAuthService(userRepo, sessionRepo, time.Hour*24)
+	authService := service.NewAuthService(userRepo, sessionRepo, time.Hour*24, cfg.UplService.URL, cfg.UplService.APIKey)
 	userService := service.NewUserService(userRepo, sessionService)
 
 	authHandler := handler.NewAuthHandler(authService)

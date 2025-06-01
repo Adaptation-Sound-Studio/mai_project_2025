@@ -5,8 +5,11 @@ import (
 	"auth_service/internal/domain/user"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,13 +20,17 @@ type AuthService struct {
 	Repo           user.UserRepository
 	SessionManager session.SessionRepository
 	SessionTTL     time.Duration
+	uploadBaseURL  string
+	apiKey         string
 }
 
-func NewAuthService(repo user.UserRepository, sm session.SessionRepository, ttl time.Duration) *AuthService {
+func NewAuthService(repo user.UserRepository, sm session.SessionRepository, ttl time.Duration, uploadBaseURL, apiKey string) *AuthService {
 	return &AuthService{
 		Repo:           repo,
 		SessionManager: sm,
 		SessionTTL:     ttl,
+		uploadBaseURL:  uploadBaseURL,
+		apiKey:         apiKey,
 	}
 }
 
@@ -80,12 +87,44 @@ func (s *AuthService) LoginUser(ctx context.Context, login, password string) (st
 		return "", err
 	}
 
+	var artistID string
+	{
+		url := fmt.Sprintf("%s/artists/user/%d", s.uploadBaseURL, usr.ID)
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			log.Printf("Login: ошибка создания HTTP-запроса в upload-сервис: %v", err)
+		} else {
+			req = req.WithContext(ctx)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-API-Key", s.apiKey)
+
+			resp, err := http.DefaultClient.Do(req) // используем стандартный клиент
+			if err != nil {
+				log.Printf("Login: ошибка при запросе в upload-сервис: %v", err)
+			} else {
+				defer resp.Body.Close()
+				if resp.StatusCode == http.StatusOK {
+					var res struct {
+						ArtistID string `json:"artist_id"`
+					}
+					if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+						log.Printf("Login: ошибка декодирования ответа upload-сервиса: %v", err)
+					} else {
+						artistID = res.ArtistID
+					}
+				} else {
+					log.Printf("Login: upload-сервис вернул статус %d", resp.StatusCode)
+				}
+			}
+		}
+	}
+
 	sessionID := uuid.NewString()
 
 	sessionData := map[string]interface{}{
 		"user_id":    usr.ID,
 		"is_deleted": usr.IsDeleted,
-		"artist_id":  "",
+		"artist_id":  artistID,
 		"role":       role,
 	}
 
