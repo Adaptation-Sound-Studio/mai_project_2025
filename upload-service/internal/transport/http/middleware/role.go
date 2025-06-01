@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"strconv"
 
 	appredis "upload-service/internal/infrastructure/redis"
 
@@ -30,7 +29,7 @@ func RequireAnyRole(redisClient *redis.Client, allowedRoles ...string) func(http
 			}
 			sessionID := cookie.Value
 
-			userID, err := appredis.GetUserID(redisClient, r.Context(), sessionID)
+			//userID, err := appredis.GetUserID(redisClient, r.Context(), sessionID)
 			if err != nil {
 				log.Printf("Middleware error: GetUserID failed for session_id %s: %v\n", sessionID, err)
 				http.Error(w, "Сессия недействительна", http.StatusUnauthorized)
@@ -39,7 +38,7 @@ func RequireAnyRole(redisClient *redis.Client, allowedRoles ...string) func(http
 
 			// Если роли переданы, проверяем роль
 			if len(allowed) > 0 {
-				role, err := appredis.GetUserRole(redisClient, strconv.FormatInt(userID, 10))
+				role, err := appredis.GetUserRole(redisClient, sessionID)
 				if err != nil {
 					http.Error(w, "Не удалось определить роль пользователя", http.StatusForbidden)
 					return

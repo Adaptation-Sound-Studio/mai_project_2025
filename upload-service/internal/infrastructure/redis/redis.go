@@ -52,13 +52,19 @@ func GetArtistID(rdb *redis.Client, userID string) (string, error) {
 	return rdb.Get(ctx, "artist:"+userID).Result()
 }
 
-func GetUserRole(rdb *redis.Client, userID string) (string, error) {
-	roleKey := "role:" + userID
-	role, err := rdb.Get(ctx, roleKey).Result()
+func GetUserRole(rdb *redis.Client, sessionID string) (string, error) {
+	val, err := rdb.Get(ctx, sessionID).Result()
 	if err == redis.Nil {
-		return "", fmt.Errorf("роль не найдена для пользователя %s", userID)
+		return "", fmt.Errorf("сессия %s не найдена", sessionID)
 	} else if err != nil {
-		return "", fmt.Errorf("ошибка при получении роли пользователя %s: %v", userID, err)
+		return "", fmt.Errorf("ошибка при получении сессии: %v", err)
 	}
-	return role, nil
+
+	var sessionData struct {
+		Role string `json:"role"`
+	}
+	if err := json.Unmarshal([]byte(val), &sessionData); err != nil {
+		return "", fmt.Errorf("не удалось распарсить сессию: %v", err)
+	}
+	return sessionData.Role, nil
 }
