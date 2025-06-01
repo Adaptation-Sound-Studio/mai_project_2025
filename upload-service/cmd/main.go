@@ -7,6 +7,7 @@ import (
 
 	"upload-service/internal/config"
 	dbinfra "upload-service/internal/infrastructure/db"
+	"upload-service/internal/infrastructure/elastic"
 	minioinfra "upload-service/internal/infrastructure/minio"
 	redisinfra "upload-service/internal/infrastructure/redis"
 	kafkapkg "upload-service/internal/kafka"
@@ -37,6 +38,19 @@ func main() {
 		log.Fatalf("Ошибка подключения к Kafka: %v", err)
 	}
 	defer kafkaProducer.Close()
+
+	elasticClient, err := elastic.NewElasticClient(cfg.Elastic)
+	if err != nil {
+		log.Fatalf("Ошибка подключения к Elasticsearch: %v", err)
+	}
+
+	// убрать после того как вставим в какой-нибудь service
+	res, err := elasticClient.Info()
+	if err != nil {
+		log.Fatalf("Elasticsearch не отвечает: %v", err)
+	}
+	defer res.Body.Close()
+	log.Println("Успешно подключено к Elasticsearch")
 
 	genreRepo := repository.NewGenreRepository(db)
 	artistRepo := repository.NewArtistRepository(db)
