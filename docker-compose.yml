@@ -1,0 +1,196 @@
+version: '3.9'
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - app-net
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.2.1
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - app-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,SSL:SSL
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,SSL://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,SSL://kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      KAFKA_SSL_KEYSTORE_FILENAME: kafka.keystore.jks
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: keystore_creds
+      KAFKA_SSL_KEY_CREDENTIALS: key_creds
+      KAFKA_SSL_TRUSTSTORE_FILENAME: kafka.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: truststore_creds
+      KAFKA_SSL_CLIENT_AUTH: none
+
+    volumes:
+      - ./analysis_service/certs:/etc/kafka/secrets
+      - ./upload-service/certs:/etc/kafka/secrets
+    depends_on:
+      - zookeeper
+    networks:
+      - app-net
+
+
+  auth_postgres:
+    image: postgres:17
+    container_name: auth-postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${AUTH_OF_DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata_auth:/var/lib/postgresql/data
+      - ./init/init_auth.sql:/docker-entrypoint-initdb.d/init_auth.sql:ro
+    networks:
+      - app-net
+
+  anal_postgres:
+    image: postgres:17
+    container_name: anal-postgres
+    restart: always
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: ${ANAL_OF_DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata_anal:/var/lib/postgresql/data
+      - ./init/init_anal.sql:/docker-entrypoint-initdb.d/init_anal.sql:ro
+    networks:
+      - app-net
+
+  upl_postgres:
+    image: postgres:17
+    container_name: upl-postgres
+    restart: always
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: ${UPL_OF_DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata_upl:/var/lib/postgresql/data
+      - ./init/init_upl.sql:/docker-entrypoint-initdb.d/init_upl.sql:ro
+    networks:
+      - app-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: auth-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    networks:
+      - app-net
+
+  auth:
+    build:
+      context: ./authorization_service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    restart: on-failure
+    depends_on:
+      - auth_postgres
+      - redis
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    networks:
+      - app-net
+
+  analytics:
+    build:
+      context: ./analysis_service
+      dockerfile: Dockerfile 
+    container_name: analytics-service
+    restart: on-failure
+    depends_on:
+      - anal_postgres
+      - kafka
+    ports:
+      - "8081:8081"
+    env_file:
+      - .env
+    volumes:
+    - ./analysis_service/certs:/certs:ro
+    networks:
+      - app-net
+
+  upload:
+    build:
+      context: ./upload-service
+      dockerfile: Dockerfile 
+    container_name: upload-service
+    restart: on-failure
+    depends_on:
+      - upl_postgres
+      - redis
+      - kafka
+      - minio
+    ports:
+      - "8082:8082"
+    env_file:
+      - .env
+    volumes:
+    - ./upload-service/certs:/certs:ro
+    networks:
+      - app-net
+  
+  elasticsearch:
+    image: elasticsearch:8.13.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - app-net
+
+
+networks:
+  app-net:
+    driver: bridge
+
+volumes:
+  pgdata_auth:
+  pgdata_anal:
+  pgdata_upl:
+  minio_data:
+  esdata:

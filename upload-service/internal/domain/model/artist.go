@@ -1,0 +1,7 @@
+package model
+
+type Artist struct {
+	ArtistID int64  `json:"artist_id"`
+	Name     string `json:"name"`
+	UserID   int64  `json:"user_id"`
+}

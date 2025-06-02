@@ -1,0 +1,5 @@
+# через docker-compose exec redis redis-cli вставить:
+SET session:admintoken 44
+SET role:44 admin
+SET session:artisttoken 55
+SET role:55 artist
