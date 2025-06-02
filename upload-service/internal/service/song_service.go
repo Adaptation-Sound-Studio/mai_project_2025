@@ -262,6 +262,10 @@ func findMissingIDs(input, existing []int64) []int64 {
 	return missing
 }
 
+func (s *SongService) IncrementAuditions(ctx context.Context, songID int64) error {
+	return s.repo.IncrementAuditions(ctx, songID)
+}
+
 func (s *SongService) GetSongArtists(ctx context.Context, songID int64) ([]model.Artist, error) {
 	return s.repo.GetArtistsBySongID(ctx, songID)
 }

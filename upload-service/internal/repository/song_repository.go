@@ -215,3 +215,9 @@ func (r *songRepository) GetAlbumBySongID(ctx context.Context, songID int64) (*m
 	}
 	return &a, nil
 }
+
+func (r *songRepository) IncrementAuditions(ctx context.Context, songID int64) error {
+	query := `UPDATE songs SET auditions = auditions + 1 WHERE song_id = $1`
+	_, err := r.db.ExecContext(ctx, query, songID)
+	return err
+}

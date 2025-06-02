@@ -284,6 +284,10 @@ func (h *SongHandler) StreamSongByID(w http.ResponseWriter, r *http.Request) {
 					log.Printf("[Stream] Ошибка при отправке события в Kafka: %v", err)
 				} else {
 					log.Printf("[Stream] Событие успешно отправлено в Kafka")
+
+					if err := h.Service.IncrementAuditions(ctx, songID); err != nil {
+						log.Printf("[Stream] Ошибка при увеличении счётчика прослушиваний: %v", err)
+					}
 				}
 				counted = true
 			}

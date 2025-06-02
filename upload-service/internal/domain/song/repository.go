@@ -15,4 +15,5 @@ type Repository interface {
 	GetAlbumBySongID(ctx context.Context, songID int64) (*model.Album, error)
 	GetGenreBySongID(ctx context.Context, songID int64) (*model.Genre, error)
 	GetOneArtistBySongID(ctx context.Context, songID int64) (*model.Artist, error)
+	IncrementAuditions(ctx context.Context, songID int64) error
 }

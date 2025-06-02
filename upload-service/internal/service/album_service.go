@@ -99,6 +99,16 @@ func (s *AlbumService) CreateAlbum(ctx context.Context, album *model.Album, song
 		return 0, err
 	}
 
+	ownedSongIDs, err := s.repo.CheckSongsBelongToArtist(ctx, tx, album.ArtistID, songIDs)
+	if err != nil {
+		return 0, err
+	}
+
+	notOwned := findMissingAlbumSongIDs(songIDs, ownedSongIDs)
+	if len(notOwned) > 0 {
+		return 0, fmt.Errorf("вы не можете добавить чужие песни: %v", notOwned)
+	}
+
 	missing := findMissingAlbumSongIDs(songIDs, existingSongIDs)
 	if len(missing) > 0 {
 		return 0, fmt.Errorf("песни с ID %v не существуют", missing)
