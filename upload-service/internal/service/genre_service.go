@@ -49,6 +49,8 @@ func (s *GenreService) CreateGenre(ctx context.Context, genre *model.Genre) (int
 		return 0, err
 	}
 
+	genre.GenreID = genreID
+
 	event := event.Genre{
 		ID:   genreID,
 		Name: genre.Name,
@@ -58,8 +60,33 @@ func (s *GenreService) CreateGenre(ctx context.Context, genre *model.Genre) (int
 		log.Printf("Ошибка отправки события genre_created: %v", err)
 	}
 
+	if err := s.indexGenre(ctx, genre); err != nil {
+		log.Printf("Ошибка индексации жанра в Elasticsearch: %v", err)
+	}
+
 	log.Printf("Жанр успешно создан с ID %d", genreID)
 	return genreID, nil
+}
+
+func (s *GenreService) indexGenre(ctx context.Context, genre *model.Genre) error {
+	body := fmt.Sprintf(`{"genre_id": %d, "name": "%s"}`, genre.GenreID, genre.Name)
+
+	res, err := s.elasticClient.Index(
+		"genres",
+		strings.NewReader(body),
+		s.elasticClient.Index.WithDocumentID(fmt.Sprint(genre.GenreID)),
+		s.elasticClient.Index.WithContext(ctx),
+		s.elasticClient.Index.WithRefresh("true"),
+	)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("ошибка индексирования жанра: %s", res.String())
+	}
+	return nil
 }
 
 func (s *GenreService) UpdateGenre(ctx context.Context, genre *model.Genre) error {

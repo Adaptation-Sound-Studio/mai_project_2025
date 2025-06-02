@@ -32,25 +32,21 @@ CREATE TABLE IF NOT EXISTS fact_listens (
 CREATE INDEX idx_fact_listens_user_listened_at
     ON fact_listens (user_id, listened_at);
 
--- Вставка жанров
 INSERT INTO genres (name) VALUES
   ('Pop'),
   ('Rock'),
   ('Jazz');
 
--- Вставка артистов
 INSERT INTO artists (name) VALUES
   ('Taylor Swift'),
   ('Queen'),
   ('Miles Davis');
 
--- Вставка песен
 INSERT INTO songs (name) VALUES
   ('Love Story'),
   ('Bohemian Rhapsody'),
   ('So What');
 
--- Вставка фактов прослушиваний
 INSERT INTO fact_listens (user_id, song_id, artist_id, genre_id, listened_at) VALUES
   (101, 1, 1, 1, '2025-06-01 10:00:00'),
   (102, 2, 2, 2, '2025-06-01 10:05:00'),
