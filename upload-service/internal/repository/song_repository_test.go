@@ -335,3 +335,68 @@ func TestBatchInsertSongsToAlbum_TooManySongs(t *testing.T) {
 	assert.Equal(t, "нельзя добавить более 50 песен в альбом", err.Error())
 	_ = tx2.Rollback()
 }
+
+func TestGetGenreBySongID(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	testutils.CleanTables(t, testDB)
+	ctx := context.Background()
+
+	repo := NewSongRepository(testDB)
+
+	t.Run("genre found", func(t *testing.T) {
+		_, err := testDB.ExecContext(ctx, `
+            INSERT INTO genres (genre_id, name) VALUES (1, 'Rock');
+            INSERT INTO songs (song_id, name, name_on_minio, genre_id) 
+            VALUES (10, 'Test Song', 'test_song.mp3', 1);
+        `)
+		require.NoError(t, err)
+
+		genre, err := repo.GetGenreBySongID(ctx, 10)
+		require.NoError(t, err)
+		require.NotNil(t, genre)
+		require.Equal(t, int64(1), genre.GenreID)
+		require.Equal(t, "Rock", genre.Name)
+	})
+
+	t.Run("genre not found", func(t *testing.T) {
+		genre, err := repo.GetGenreBySongID(ctx, 999)
+		require.NoError(t, err)
+		require.Nil(t, genre)
+	})
+}
+
+func TestGetOneArtistBySongID(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	testutils.CleanTables(t, testDB)
+	ctx := context.Background()
+
+	repo := NewSongRepository(testDB)
+
+	t.Run("artist found", func(t *testing.T) {
+		_, err := testDB.ExecContext(ctx, `
+			INSERT INTO artists (artist_id, name, user_id) VALUES (1, 'Test Artist', 100);
+			INSERT INTO genres (genre_id, name) VALUES (1, 'Rock');
+			INSERT INTO songs (song_id, name, name_on_minio, genre_id) 
+			VALUES (10, 'Test Song', 'song.mp3', 1);
+			INSERT INTO song_artist (sa_id, song_id, artist_id) VALUES (1, 10, 1);
+		`)
+		require.NoError(t, err)
+
+		artist, err := repo.GetOneArtistBySongID(ctx, 10)
+		require.NoError(t, err)
+		require.NotNil(t, artist)
+		require.Equal(t, int64(1), artist.ArtistID)
+		require.Equal(t, "Test Artist", artist.Name)
+		require.Equal(t, int64(100), artist.UserID)
+	})
+
+	t.Run("artist not found", func(t *testing.T) {
+		artist, err := repo.GetOneArtistBySongID(ctx, 999)
+		require.NoError(t, err)
+		require.Nil(t, artist)
+	})
+}

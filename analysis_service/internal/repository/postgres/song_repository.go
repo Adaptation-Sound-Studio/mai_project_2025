@@ -54,3 +54,64 @@ LIMIT $1;
 
 	return result, nil
 }
+
+func (r *SongRepo) GetTopSongsForUser(userID int, limit int) ([]song.Song, error) {
+	rows, err := r.DB.Query(`
+		SELECT s.song_id, s.name, COUNT(*) AS listen_count
+		FROM fact_listens fl
+		JOIN songs s ON fl.song_id = s.song_id
+		WHERE fl.user_id = $1
+		GROUP BY s.song_id, s.name
+		ORDER BY listen_count DESC
+		LIMIT $2
+	`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var songs []song.Song
+	for rows.Next() {
+		var s song.Song
+		var count int
+		if err := rows.Scan(&s.ID, &s.Name, &count); err != nil {
+			return nil, err
+		}
+		songs = append(songs, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return songs, nil
+}
+
+func (r *SongRepo) GetMostPopularSongs(limit int) ([]song.Song, error) {
+	rows, err := r.DB.Query(`
+		SELECT s.song_id, s.name, COUNT(*) AS listen_count
+		FROM fact_listens fl
+		JOIN songs s ON fl.song_id = s.song_id
+		GROUP BY s.song_id, s.name
+		ORDER BY listen_count DESC
+		LIMIT $1
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var songs []song.Song
+	for rows.Next() {
+		var s song.Song
+		var count int
+		if err := rows.Scan(&s.ID, &s.Name, &count); err != nil {
+			return nil, err
+		}
+		songs = append(songs, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return songs, nil
+}

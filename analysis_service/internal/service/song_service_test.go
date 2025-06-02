@@ -24,6 +24,15 @@ func (m *MockSongRepo) GetPopularSongs(limit int) ([]song.PopularSong, error) {
 	return args.Get(0).([]song.PopularSong), args.Error(1)
 }
 
+func (m *MockSongRepo) GetTopSongsForUser(userID int, limit int) ([]song.Song, error) {
+	args := m.Called(userID, limit)
+	return args.Get(0).([]song.Song), args.Error(1)
+}
+
+func (m *MockSongRepo) GetMostPopularSongs(limit int) ([]song.Song, error) {
+	args := m.Called(limit)
+	return args.Get(0).([]song.Song), args.Error(1)
+}
 func TestCreateSong_Success(t *testing.T) {
 	mockRepo := new(MockSongRepo)
 	s := NewSongService(mockRepo)
@@ -79,5 +88,31 @@ func TestGetPopularSongs_Failure(t *testing.T) {
 
 	assert.Nil(t, result)
 	assert.EqualError(t, err, "db error")
+	mockRepo.AssertExpectations(t)
+}
+
+func TestSongService(t *testing.T) {
+	mockRepo := new(MockSongRepo)
+	svc := NewSongService(mockRepo)
+
+	userID := 1
+	limit := 3
+	expected := []song.Song{
+		{ID: 1, Name: "Song1"},
+		{ID: 2, Name: "Song2"},
+		{ID: 3, Name: "Song3"},
+	}
+
+	mockRepo.On("GetTopSongsForUser", userID, limit).Return(expected, nil)
+	mockRepo.On("GetMostPopularSongs", limit).Return(expected, nil)
+
+	res1, err1 := svc.GetTopSongsForUser(userID, limit)
+	assert.NoError(t, err1)
+	assert.Equal(t, expected, res1)
+
+	res2, err2 := svc.GetMostPopularSongs(limit)
+	assert.NoError(t, err2)
+	assert.Equal(t, expected, res2)
+
 	mockRepo.AssertExpectations(t)
 }

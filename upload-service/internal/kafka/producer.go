@@ -15,6 +15,12 @@ type Producer struct {
 	writer *kafka.Writer
 }
 
+type ProducerIface interface {
+	SendWrappedEvent(eventType string, payload interface{}) error
+}
+
+var _ ProducerIface = (*Producer)(nil)
+
 func NewProducer(brokers []string, topic string) (*Producer, error) {
 	caCert, err := os.ReadFile("/certs/ca.crt")
 	if err != nil {

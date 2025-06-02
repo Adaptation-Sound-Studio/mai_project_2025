@@ -104,3 +104,73 @@ func TestGetUserRole_NotFound(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "не найдена")
 }
+
+func TestGetArtistID_Errors(t *testing.T) {
+	ctx := context.Background()
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "Rbkkth3920",
+		DB:       0,
+	})
+	defer rdb.Close()
+
+	t.Run("session not found", func(t *testing.T) {
+		_, err := GetArtistID(rdb, "nonexistent_session")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "не найдена")
+	})
+
+	t.Run("invalid JSON in session", func(t *testing.T) {
+		sessionID := "bad_json"
+		rdb.Set(ctx, sessionID, "not_a_json", 0)
+		defer rdb.Del(ctx, sessionID)
+
+		_, err := GetArtistID(rdb, sessionID)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "не удалось распарсить")
+	})
+
+	t.Run("redis unavailable", func(t *testing.T) {
+		badRdb := redis.NewClient(&redis.Options{
+			Addr: "localhost:9999",
+		})
+		_, err := GetArtistID(badRdb, "any")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "ошибка при получении")
+	})
+}
+
+func TestSetArtistID_Errors(t *testing.T) {
+	ctx := context.Background()
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "Rbkkth3920",
+		DB:       0,
+	})
+	defer rdb.Close()
+
+	t.Run("session not found", func(t *testing.T) {
+		err := SetArtistID(rdb, "nonexistent_session", "42")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "не найдена")
+	})
+
+	t.Run("invalid JSON in session", func(t *testing.T) {
+		sessionID := "bad_json"
+		require.NoError(t, rdb.Set(ctx, sessionID, "not_json", 0).Err())
+		defer rdb.Del(ctx, sessionID)
+
+		err := SetArtistID(rdb, sessionID, "42")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "не удалось распарсить")
+	})
+
+	t.Run("redis unavailable", func(t *testing.T) {
+		badRdb := redis.NewClient(&redis.Options{
+			Addr: "localhost:9999",
+		})
+		err := SetArtistID(badRdb, "any", "42")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "ошибка при получении")
+	})
+}

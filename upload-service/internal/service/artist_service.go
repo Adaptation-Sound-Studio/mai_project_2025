@@ -25,7 +25,7 @@ type ArtistService struct {
 	repo          artist.Repository
 	authBaseURL   string
 	apiKey        string
-	producer      *kafka.Producer
+	producer      kafka.ProducerIface
 	elasticClient *elasticsearch.Client
 }
 
@@ -153,6 +153,9 @@ func (s *ArtistService) RegisterArtist(ctx context.Context, artist *model.Artist
 }
 
 func (s *ArtistService) indexArtist(ctx context.Context, artist *model.Artist) error {
+	if s.elasticClient == nil {
+		return nil
+	}
 	body := fmt.Sprintf(`{
 		"artist_id": %d,
 		"name": "%s",

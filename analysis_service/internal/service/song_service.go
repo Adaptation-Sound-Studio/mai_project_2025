@@ -17,3 +17,9 @@ func (s *SongService) CreateSong(song *song.Song) error {
 func (s *SongService) GetPopularSongs(limit int) ([]song.PopularSong, error) {
 	return s.Repo.GetPopularSongs(limit)
 }
+func (s *SongService) GetTopSongsForUser(userID int, limit int) ([]song.Song, error) {
+	return s.Repo.GetTopSongsForUser(userID, limit)
+}
+func (s *SongService) GetMostPopularSongs(limit int) ([]song.Song, error) {
+	return s.Repo.GetMostPopularSongs(limit)
+}
