@@ -301,3 +301,26 @@ func (h *SongHandler) StreamSongByID(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[Stream] Завершён стриминг песни ID: %d", songID)
 }
+
+func (h *SongHandler) SearchSongs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Метод не разрешён", http.StatusMethodNotAllowed)
+		return
+	}
+
+	filters := map[string]string{
+		"name":   r.URL.Query().Get("name"),
+		"genre":  r.URL.Query().Get("genre"),
+		"artist": r.URL.Query().Get("artist"),
+	}
+
+	songs, err := h.Service.SearchSongs(r.Context(), filters)
+	if err != nil {
+		log.Printf("Ошибка при поиске песни: %v", err)
+		http.Error(w, "Ошибка при поиске песни", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(songs)
+}

@@ -140,6 +140,41 @@ func (r *songRepository) CheckArtistsExist(ctx context.Context, artistIDs []int6
 	return existing, nil
 }
 
+func (r *songRepository) GetOneArtistBySongID(ctx context.Context, songID int64) (*model.Artist, error) {
+	var artist model.Artist
+	err := r.db.QueryRowContext(ctx, `
+        SELECT a.artist_id, a.name, a.user_id
+        FROM artists a
+        JOIN song_artist sa ON a.artist_id = sa.artist_id
+        WHERE sa.song_id = $1
+        LIMIT 1
+    `, songID).Scan(&artist.ArtistID, &artist.Name, &artist.UserID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &artist, nil
+}
+
+func (r *songRepository) GetGenreBySongID(ctx context.Context, songID int64) (*model.Genre, error) {
+	var genre model.Genre
+	err := r.db.QueryRowContext(ctx, `
+        SELECT g.genre_id, g.name
+        FROM genres g
+        JOIN songs s ON g.genre_id = s.genre_id
+        WHERE s.song_id = $1
+    `, songID).Scan(&genre.GenreID, &genre.Name)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &genre, nil
+}
+
 func (r *songRepository) GetArtistsBySongID(ctx context.Context, songID int64) ([]model.Artist, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT a.artist_id, a.name, a.user_id 

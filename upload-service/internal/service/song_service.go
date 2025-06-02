@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -15,24 +16,27 @@ import (
 	"upload-service/internal/domain/song"
 	"upload-service/internal/kafka"
 
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/minio/minio-go/v7"
 )
 
 var ErrSongNotFound = errors.New("песня не найдена")
 
 type SongService struct {
-	repo        song.Repository
-	minioClient *minio.Client
-	bucketName  string
-	producer    *kafka.Producer
+	repo          song.Repository
+	minioClient   *minio.Client
+	bucketName    string
+	producer      *kafka.Producer
+	elasticClient *elasticsearch.Client
 }
 
-func NewSongService(r song.Repository, minioClient *minio.Client, bucketName string, producer *kafka.Producer) *SongService {
+func NewSongService(r song.Repository, minioClient *minio.Client, bucketName string, producer *kafka.Producer, elasticClient *elasticsearch.Client) *SongService {
 	return &SongService{
-		repo:        r,
-		minioClient: minioClient,
-		bucketName:  bucketName,
-		producer:    producer,
+		repo:          r,
+		minioClient:   minioClient,
+		bucketName:    bucketName,
+		producer:      producer,
+		elasticClient: elasticClient,
 	}
 }
 
@@ -150,7 +154,62 @@ func (s *SongService) CreateSong(ctx context.Context, song *model.Song, artistID
 		log.Printf("Ошибка при отправке события song_created: %v", err)
 	}
 
+	artistObj, err := s.repo.GetOneArtistBySongID(ctx, songID)
+	if err != nil {
+		log.Printf("Ошибка получения артиста по песне: %v", err)
+	}
+	artist := ""
+	if artistObj != nil {
+		artist = artistObj.Name
+	}
+
+	genreObj, err := s.repo.GetGenreBySongID(ctx, songID)
+	if err != nil {
+		log.Printf("Ошибка получения жанра по песне: %v", err)
+	}
+	genre := ""
+	if genreObj != nil {
+		genre = genreObj.Name
+	}
+
+	songElastic := model.SongElastic{
+		SongID:      song.SongID,
+		Name:        song.Name,
+		NameOfMinio: song.NameOfMinio,
+		Auditions:   song.Auditions,
+		Genre:       genre,
+		Artist:      artist,
+	}
+
+	if err := s.indexSong(ctx, &songElastic); err != nil {
+		log.Printf("Ошибка индексации песни в Elasticsearch: %v", err)
+	}
+
 	log.Printf("Песня успешно создана с ID %d", songID)
+	return nil
+}
+
+func (s *SongService) indexSong(ctx context.Context, song *model.SongElastic) error {
+	doc, err := json.Marshal(song)
+	if err != nil {
+		return fmt.Errorf("ошибка маршалинга JSON: %w", err)
+	}
+
+	res, err := s.elasticClient.Index(
+		"songs",
+		strings.NewReader(string(doc)),
+		s.elasticClient.Index.WithDocumentID(fmt.Sprint(song.SongID)),
+		s.elasticClient.Index.WithContext(ctx),
+		s.elasticClient.Index.WithRefresh("true"),
+	)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("ошибка индексирования песни: %s", res.String())
+	}
 	return nil
 }
 
@@ -209,4 +268,59 @@ func (s *SongService) GetSongArtists(ctx context.Context, songID int64) ([]model
 
 func (s *SongService) GetArtistsBySongID(ctx context.Context, songID int64) ([]model.Artist, error) {
 	return s.repo.GetArtistsBySongID(ctx, songID)
+}
+
+func (s *SongService) SearchSongs(ctx context.Context, filters map[string]string) ([]model.SongElastic, error) {
+	mustClauses := []string{}
+
+	for field, value := range filters {
+		if value != "" {
+			mustClauses = append(mustClauses, fmt.Sprintf(`{
+				"match": {
+					"%s": {
+						"query": "%s",
+						"fuzziness": "AUTO"
+					}
+				}
+			}`, field, value))
+		}
+	}
+
+	body := fmt.Sprintf(`{
+		"query": {
+			"bool": {
+				"must": [%s]
+			}
+		}
+	}`, strings.Join(mustClauses, ","))
+
+	res, err := s.elasticClient.Search(
+		s.elasticClient.Search.WithContext(ctx),
+		s.elasticClient.Search.WithIndex("songs"),
+		s.elasticClient.Search.WithBody(strings.NewReader(body)),
+		s.elasticClient.Search.WithPretty(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	var result struct {
+		Hits struct {
+			Hits []struct {
+				Source model.SongElastic `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	songs := make([]model.SongElastic, 0, len(result.Hits.Hits))
+	for _, hit := range result.Hits.Hits {
+		songs = append(songs, hit.Source)
+	}
+
+	return songs, nil
 }

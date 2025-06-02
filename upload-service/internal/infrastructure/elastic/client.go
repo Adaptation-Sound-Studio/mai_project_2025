@@ -54,14 +54,14 @@ func CreateIndex(client *elasticsearch.Client, indexName string, mapping string)
 func CreateAllIndices(client *elasticsearch.Client) error {
 	songMapping := `{
   "mappings": {
-   "properties": {
-    "song_id": { "type": "long" },
-    "name": { "type": "text" },
-    "genre": { "type": "keyword" },
-    "date": { "type": "date" }
-   }
+    "properties": {
+      "song_id":     { "type": "long" },
+      "name":        { "type": "text" },
+      "genre":       { "type": "keyword" },
+      "artist_name": { "type": "text" },
+    }
   }
- }`
+}`
 
 	albumMapping := `{
   "mappings": {
