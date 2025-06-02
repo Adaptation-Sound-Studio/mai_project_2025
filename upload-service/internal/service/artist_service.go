@@ -145,7 +145,36 @@ func (s *ArtistService) RegisterArtist(ctx context.Context, artist *model.Artist
 		log.Printf("Ошибка отправки события artist_created: %v", err)
 	}
 
+	if err := s.indexArtist(ctx, artist); err != nil {
+		log.Printf("Ошибка индексации артиста в Elasticsearch: %v", err)
+	}
+
 	return artistID, nil
+}
+
+func (s *ArtistService) indexArtist(ctx context.Context, artist *model.Artist) error {
+	body := fmt.Sprintf(`{
+		"artist_id": %d,
+		"name": "%s",
+		"user_id": %d
+	}`, artist.ArtistID, artist.Name, artist.UserID)
+
+	res, err := s.elasticClient.Index(
+		"artists",
+		strings.NewReader(body),
+		s.elasticClient.Index.WithDocumentID(fmt.Sprint(artist.ArtistID)),
+		s.elasticClient.Index.WithContext(ctx),
+		s.elasticClient.Index.WithRefresh("true"),
+	)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("ошибка индексирования артиста: %s", res.String())
+	}
+	return nil
 }
 
 func (s *ArtistService) UpdateArtist(ctx context.Context, artist *model.Artist) error {
