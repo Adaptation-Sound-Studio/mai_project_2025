@@ -40,8 +40,9 @@ func main() {
 
 	router := http.NewRouter(dbConn, cfg.Admin.Secret)
 
-	log.Println("Сервер запущен на порту 8081")
-	if err := nethttp.ListenAndServe(":8081", router); err != nil {
+	port := cfg.Server.Port
+	log.Printf("Сервер запущен на порту %s", port)
+	if err := nethttp.ListenAndServe(":"+port, router); err != nil {
 		log.Fatalf("Ошибка запуска сервера: %v", err)
 	}
 }

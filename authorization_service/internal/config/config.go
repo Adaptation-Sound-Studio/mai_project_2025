@@ -51,7 +51,7 @@ func LoadConfig() *Config {
 			Password: os.Getenv("REDIS_PASSWORD"),
 		},
 		Server: &ServerConfig{
-			Port: os.Getenv("SERVER_PORT"),
+			Port: os.Getenv("AUTH_SERVER_PORT"),
 		},
 		ServiceApiKey: os.Getenv("SERVICE_API_KEY"),
 		UplService: &UplServiceConfig{
