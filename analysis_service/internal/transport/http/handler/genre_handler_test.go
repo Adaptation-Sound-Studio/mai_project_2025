@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -85,4 +86,32 @@ func TestCreateGenre_Forbidden(t *testing.T) {
 
 	require.Equal(t, http.StatusForbidden, rec.Code)
 	require.Contains(t, rec.Body.String(), "Forbidden")
+}
+
+func TestCreateGenre_InternalError(t *testing.T) {
+	mockRepo := &MockGenreRepo{}
+	mockRepo.
+		On("Create", mock.AnythingOfType("*genre.Genre")).
+		Return(errors.New("database failure"))
+
+	service := service.NewGenreService(mockRepo)
+	handler := NewGenreHandler(service, "admin-secret")
+
+	router := mux.NewRouter()
+	router.HandleFunc("/genres", handler.CreateGenre).Methods("POST")
+
+	input := genre.Genre{Name: "Blues"}
+	body, _ := json.Marshal(input)
+
+	req := httptest.NewRequest(http.MethodPost, "/genres", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Admin-Key", "admin-secret")
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	require.Contains(t, rec.Body.String(), "Failed to create genre")
+
+	mockRepo.AssertExpectations(t)
 }
