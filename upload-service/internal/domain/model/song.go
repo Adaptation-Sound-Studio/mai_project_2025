@@ -5,7 +5,6 @@ import "time"
 type Song struct {
 	SongID      int64     `json:"song_id"`
 	Name        string    `json:"name"`
-	URL         string    `json:"URL"`
 	NameOfMinio string    `json:"NameOfMinio"`
 	Auditions   int64     `json:"auditions"`
 	GenreID     int64     `json:"genre_id"`

@@ -168,6 +168,21 @@ services:
     - ./upload-service/certs:/certs:ro
     networks:
       - app-net
+  
+  elasticsearch:
+    image: elasticsearch:8.13.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - app-net
+
 
 networks:
   app-net:
@@ -178,3 +193,4 @@ volumes:
   pgdata_anal:
   pgdata_upl:
   minio_data:
+  esdata:

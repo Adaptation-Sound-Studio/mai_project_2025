@@ -22,6 +22,7 @@ func NewRouter(
 
 	r := mux.NewRouter()
 
+	r.Handle("/genres/search", middleware.RequireAnyRole(redisClient)(http.HandlerFunc(genreHandler.SearchGenres))).Methods("GET")
 	r.Handle("/genres", middleware.RequireAnyRole(redisClient)(http.HandlerFunc(genreHandler.GetAllGenres))).Methods("GET")
 	r.Handle("/genres", middleware.RequireAnyRole(redisClient, "admin")(http.HandlerFunc(genreHandler.CreateGenre))).Methods("POST")
 	r.Handle("/genres/{genre_id}", middleware.RequireAnyRole(redisClient, "admin")(http.HandlerFunc(genreHandler.UpdateGenre))).Methods("PUT")

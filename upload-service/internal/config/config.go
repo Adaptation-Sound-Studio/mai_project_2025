@@ -33,6 +33,12 @@ type KafkaConfig struct {
 	Topic   string
 }
 
+type ElasticConfig struct {
+	URL      string
+	Username string
+	Password string
+}
+
 type Config struct {
 	DB          *DBConfig
 	Redis       *RedisConfig
@@ -40,6 +46,7 @@ type Config struct {
 	AuthService *AuthServiceConfig
 	APIKey      string
 	Kafka       *KafkaConfig
+	Elastic     *ElasticConfig
 }
 
 func LoadConfig() *Config {
@@ -67,6 +74,11 @@ func LoadConfig() *Config {
 		Kafka: &KafkaConfig{
 			Brokers: os.Getenv("KAFKA_BROKERS"),
 			Topic:   os.Getenv("KAFKA_TOPIC"),
+		},
+		Elastic: &ElasticConfig{
+			URL:      os.Getenv("ELASTIC_URL"),
+			Username: os.Getenv("ELASTIC_USER"),
+			Password: os.Getenv("ELASTIC_PASS"),
 		},
 	}
 }

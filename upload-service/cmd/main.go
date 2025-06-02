@@ -7,6 +7,7 @@ import (
 
 	"upload-service/internal/config"
 	dbinfra "upload-service/internal/infrastructure/db"
+	"upload-service/internal/infrastructure/elastic"
 	minioinfra "upload-service/internal/infrastructure/minio"
 	redisinfra "upload-service/internal/infrastructure/redis"
 	kafkapkg "upload-service/internal/kafka"
@@ -38,12 +39,21 @@ func main() {
 	}
 	defer kafkaProducer.Close()
 
+	elasticClient, err := elastic.NewElasticClient(cfg.Elastic)
+	if err != nil {
+		log.Fatalf("Ошибка подключения к Elasticsearch: %v", err)
+	}
+
+	if err := elastic.CreateAllIndices(elasticClient); err != nil {
+		log.Printf("Ошибка при создании индексов: %v", err)
+	}
+
 	genreRepo := repository.NewGenreRepository(db)
 	artistRepo := repository.NewArtistRepository(db)
 	songRepo := repository.NewSongRepository(db)
 	albumRepo := repository.NewAlbumRepository(db)
 
-	genreService := service.NewGenreService(genreRepo, kafkaProducer)
+	genreService := service.NewGenreService(genreRepo, kafkaProducer, elasticClient)
 	artistService := service.NewArtistService(artistRepo, cfg.AuthService.URL, cfg.AuthService.APIKey, kafkaProducer)
 	songService := service.NewSongService(songRepo, minioClient, minioBucket, kafkaProducer)
 	albumService := service.NewAlbumService(db, albumRepo)
