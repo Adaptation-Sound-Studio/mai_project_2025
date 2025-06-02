@@ -9,20 +9,24 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"upload-service/internal/domain/artist"
 	"upload-service/internal/domain/event"
 	"upload-service/internal/domain/model"
 	"upload-service/internal/domain/response"
 	"upload-service/internal/kafka"
+
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 var ErrArtistNotFound = errors.New("артист не найден")
 
 type ArtistService struct {
-	repo        artist.Repository
-	authBaseURL string
-	apiKey      string
-	producer    *kafka.Producer
+	repo          artist.Repository
+	authBaseURL   string
+	apiKey        string
+	producer      *kafka.Producer
+	elasticClient *elasticsearch.Client
 }
 
 type roleUpdateRequest struct {
@@ -30,12 +34,13 @@ type roleUpdateRequest struct {
 	Role   string `json:"role"`
 }
 
-func NewArtistService(r artist.Repository, authBaseURL, apiKey string, producer *kafka.Producer) *ArtistService {
+func NewArtistService(r artist.Repository, authBaseURL, apiKey string, producer *kafka.Producer, elasticClient *elasticsearch.Client) *ArtistService {
 	return &ArtistService{
-		repo:        r,
-		authBaseURL: authBaseURL,
-		apiKey:      apiKey,
-		producer:    producer,
+		repo:          r,
+		authBaseURL:   authBaseURL,
+		apiKey:        apiKey,
+		producer:      producer,
+		elasticClient: elasticClient,
 	}
 }
 
@@ -179,4 +184,47 @@ func (s *ArtistService) GetArtistIDByUserID(ctx context.Context, userID int64) (
 		return "", nil
 	}
 	return strconv.FormatInt(artist.ArtistID, 10), nil
+}
+
+func (s *ArtistService) SearchArtists(ctx context.Context, query string) ([]model.Artist, error) {
+	log.Println("SearchArtists hit with query:", query)
+
+	res, err := s.elasticClient.Search(
+		s.elasticClient.Search.WithContext(ctx),
+		s.elasticClient.Search.WithIndex("artists"),
+		s.elasticClient.Search.WithBody(strings.NewReader(fmt.Sprintf(`{
+			"query": {
+				"match": {
+					"name": {
+						"query": "%s",
+						"fuzziness": "AUTO"
+					}
+				}
+			}
+		}`, query))),
+		s.elasticClient.Search.WithPretty(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	var result struct {
+		Hits struct {
+			Hits []struct {
+				Source model.Artist `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	artists := make([]model.Artist, 0, len(result.Hits.Hits))
+	for _, hit := range result.Hits.Hits {
+		artists = append(artists, hit.Source)
+	}
+
+	return artists, nil
 }

@@ -194,3 +194,26 @@ func (h *ArtistHandler) GetArtistIDByUserID(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"artist_id": artistID})
 }
+
+func (h *ArtistHandler) SearchArtists(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Метод не разрешён", http.StatusMethodNotAllowed)
+		return
+	}
+
+	q := r.URL.Query().Get("q")
+	if q == "" {
+		http.Error(w, "Параметр q обязателен", http.StatusBadRequest)
+		return
+	}
+
+	artists, err := h.Service.SearchArtists(r.Context(), q)
+	if err != nil {
+		log.Printf("Ошибка при поиске артистов: %v", err)
+		http.Error(w, "Ошибка при поиске артистов", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(artists)
+}
