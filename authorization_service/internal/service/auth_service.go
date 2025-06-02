@@ -98,7 +98,7 @@ func (s *AuthService) LoginUser(ctx context.Context, login, password string) (st
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("X-API-Key", s.apiKey)
 
-			resp, err := http.DefaultClient.Do(req) // используем стандартный клиент
+			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				log.Printf("Login: ошибка при запросе в upload-сервис: %v", err)
 			} else {

@@ -75,7 +75,7 @@ func TestCreateSession_InvalidData(t *testing.T) {
 	manager := setupTestRedis()
 
 	data := map[string]interface{}{
-		"invalid": make(chan int), // каналы не сериализуются
+		"invalid": make(chan int),
 	}
 
 	err := manager.CreateSession(context.Background(), "bad_json", data, time.Minute)
@@ -143,7 +143,6 @@ func TestGetSessionField_InvalidJSON(t *testing.T) {
 }
 
 func TestGetSessionField_RedisError(t *testing.T) {
-	// Используем клиент на несуществующем порту, чтобы сымитировать ошибку
 	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6390", Password: ""})
 	repo := NewSessionRepository(rdb)
 

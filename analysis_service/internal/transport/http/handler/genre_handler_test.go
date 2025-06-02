@@ -51,7 +51,7 @@ func TestCreateGenre_Success(t *testing.T) {
 }
 
 func TestCreateGenre_BadJSON(t *testing.T) {
-	mockRepo := &MockGenreRepo{} // не нужен вызов On, потому что не дойдёт до него
+	mockRepo := &MockGenreRepo{}
 	service := service.NewGenreService(mockRepo)
 	handler := NewGenreHandler(service, "admin-secret")
 

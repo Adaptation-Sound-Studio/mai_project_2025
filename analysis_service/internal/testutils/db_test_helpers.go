@@ -11,7 +11,6 @@ var TestDB *sql.DB
 func CleanTables(t *testing.T, db *sql.DB) {
 	t.Helper()
 
-	// Отключаем ограничения на время удаления
 	_, err := db.Exec(`SET session_replication_role = 'replica'`)
 	if err != nil {
 		t.Fatalf("failed to disable foreign key checks: %v", err)
@@ -31,7 +30,6 @@ func CleanTables(t *testing.T, db *sql.DB) {
 		}
 	}
 
-	// Возвращаем проверку внешних ключей обратно
 	_, err = db.Exec(`SET session_replication_role = 'origin'`)
 	if err != nil {
 		t.Fatalf("failed to re-enable foreign key checks: %v", err)

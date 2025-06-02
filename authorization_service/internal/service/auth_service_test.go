@@ -180,7 +180,6 @@ func TestLoginUser_UploadDecodeError(t *testing.T) {
 	mockRepo.On("GetRoleByUserID", int64(1)).Return("artist", nil)
 	mockSession.On("CreateSession", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("map[string]interface {}"), mock.Anything).Return(nil)
 
-	// поддельный upload-сервер, возвращающий некорректный JSON
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`invalid json`))

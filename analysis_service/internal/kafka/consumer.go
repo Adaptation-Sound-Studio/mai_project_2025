@@ -43,10 +43,9 @@ func NewConsumer(
 		log.Fatal("Ошибка добавления ca.crt в пул доверенных")
 	}
 
-	// TLS-конфигурация
 	tlsConfig := &tls.Config{
 		RootCAs:            caPool,
-		InsecureSkipVerify: false, // проверяет, что CN=localhost
+		InsecureSkipVerify: false,
 	}
 
 	reader := kafka.NewReader(kafka.ReaderConfig{

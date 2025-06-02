@@ -18,7 +18,7 @@ type sessionRepoMock struct {
 }
 
 func (m *sessionRepoMock) CreateSession(ctx context.Context, sessionID string, data map[string]interface{}, expiration time.Duration) error {
-	return nil // не используется в тестах
+	return nil
 }
 
 func (m *sessionRepoMock) GetUserIDFromSession(ctx context.Context, sessionID string) (int64, error) {

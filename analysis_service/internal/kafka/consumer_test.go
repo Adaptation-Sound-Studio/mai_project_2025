@@ -71,7 +71,6 @@ func (c *testConsumer) Start(ctx context.Context) {
 	}
 }
 
-// Тест на правильную логику
 func TestConsumer_Start_HandlesValidAndInvalidJSON(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

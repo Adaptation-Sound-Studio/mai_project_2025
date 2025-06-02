@@ -30,14 +30,12 @@ func RequireAnyRole(redisClient *redis.Client, allowedRoles ...string) func(http
 			}
 			sessionID := cookie.Value
 
-			//userID, err := appredis.GetUserID(redisClient, r.Context(), sessionID)
 			if err != nil {
 				log.Printf("Middleware error: GetUserID failed for session_id %s: %v\n", sessionID, err)
 				http.Error(w, "Сессия недействительна", http.StatusUnauthorized)
 				return
 			}
 
-			// Если роли переданы, проверяем роль
 			if len(allowed) > 0 {
 				our_role, err := appredis.GetUserRole(redisClient, sessionID)
 				our_role = strings.ToLower(strings.TrimSpace(our_role))
@@ -56,7 +54,6 @@ func RequireAnyRole(redisClient *redis.Client, allowedRoles ...string) func(http
 				return
 			}
 
-			// Если роли не переданы — просто передаем контекст дальше без роли
 			ctx := context.WithValue(r.Context(), roleKey, "")
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

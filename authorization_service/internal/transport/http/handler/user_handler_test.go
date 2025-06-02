@@ -126,7 +126,6 @@ func TestUpdateUserRole_Failure(t *testing.T) {
 	mockUserRepo := &mockUserRepo{}
 	mockSession := &mockSessionRepo{}
 
-	// имитируем ошибку при UpdateUserRole
 	mockUserRepo.GetByIDFunc = func(id int64) (*user.User, error) {
 		return &user.User{ID: id, Name: "Test", Login: "test", Pass: "hash"}, nil
 	}

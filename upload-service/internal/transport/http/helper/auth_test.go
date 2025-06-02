@@ -45,7 +45,6 @@ func TestGetCurrentArtistID_ArtistNotFound(t *testing.T) {
 	ctx := context.Background()
 	rdb := SetupTestRedis(t)
 
-	// только сессия, без artist:user-1
 	err := rdb.Set(ctx, "session:token-xyz", "user-1", 0).Err()
 	require.NoError(t, err)
 
@@ -112,7 +111,6 @@ func TestGetUserID_InvalidUserIDFormat(t *testing.T) {
 func TestGetUserID_SessionNotFound(t *testing.T) {
 	rdb := SetupTestRedis(t)
 
-	// не устанавливаем ключ session:missing-token
 	req := httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "missing-token")
 

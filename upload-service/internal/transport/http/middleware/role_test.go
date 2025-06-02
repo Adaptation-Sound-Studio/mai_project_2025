@@ -49,7 +49,6 @@ func TestRequireAnyRole_MissingAuthorizationHeader(t *testing.T) {
 func TestRequireAnyRole_InvalidSession(t *testing.T) {
 	rdb := SetupTestRedis(t)
 
-	// session не установлен
 	req := httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "invalid-token")
 	rr := httptest.NewRecorder()
