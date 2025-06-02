@@ -72,7 +72,7 @@ func main() {
 		cfg,
 	)
 
-	port := "8082"
+	port := cfg.Server.Port
 	log.Printf("Сервер запущен на порту %s", port)
 	if err := http.ListenAndServe(":"+port, router); err != nil {
 		log.Fatalf("Ошибка запуска HTTP-сервера: %v", err)
