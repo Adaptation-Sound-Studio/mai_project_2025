@@ -2,21 +2,31 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
+	"strings"
 	"upload-service/internal/domain/event"
 	"upload-service/internal/domain/genre"
 	"upload-service/internal/domain/model"
 	"upload-service/internal/kafka"
+
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 type GenreService struct {
-	repo     genre.Repository
-	producer *kafka.Producer
+	repo          genre.Repository
+	producer      *kafka.Producer
+	elasticClient *elasticsearch.Client
 }
 
-func NewGenreService(r genre.Repository, producer *kafka.Producer) *GenreService {
-	return &GenreService{repo: r, producer: producer}
+func NewGenreService(r genre.Repository, producer *kafka.Producer, elasticClient *elasticsearch.Client) *GenreService {
+	return &GenreService{
+		repo:          r,
+		producer:      producer,
+		elasticClient: elasticClient,
+	}
 }
 
 func (s *GenreService) GetAllGenres(ctx context.Context) ([]model.Genre, error) {
@@ -68,4 +78,45 @@ func (s *GenreService) UpdateGenre(ctx context.Context, genre *model.Genre) erro
 
 	log.Printf("Жанр с ID %d успешно обновлён", genre.GenreID)
 	return nil
+}
+
+func (s *GenreService) SearchGenres(ctx context.Context, query string) ([]model.Genre, error) {
+	res, err := s.elasticClient.Search(
+		s.elasticClient.Search.WithContext(ctx),
+		s.elasticClient.Search.WithIndex("genres"),
+		s.elasticClient.Search.WithBody(strings.NewReader(fmt.Sprintf(`{
+			"query": {
+				"match": {
+					"name": {
+						"query": "%s",
+						"fuzziness": "AUTO"
+					}
+				}
+			}
+		}`, query))),
+		s.elasticClient.Search.WithPretty(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	var result struct {
+		Hits struct {
+			Hits []struct {
+				Source model.Genre `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	genres := make([]model.Genre, 0, len(result.Hits.Hits))
+	for _, hit := range result.Hits.Hits {
+		genres = append(genres, hit.Source)
+	}
+
+	return genres, nil
 }

@@ -105,3 +105,26 @@ func (h *GenreHandler) UpdateGenre(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "Жанр успешно обновлён"})
 }
+
+func (h *GenreHandler) SearchGenres(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Метод не разрешён", http.StatusMethodNotAllowed)
+		return
+	}
+
+	q := r.URL.Query().Get("q")
+	if q == "" {
+		http.Error(w, "Параметр q обязателен", http.StatusBadRequest)
+		return
+	}
+
+	genres, err := h.Service.SearchGenres(r.Context(), q)
+	if err != nil {
+		log.Printf("Ошибка при поиске жанров: %v", err)
+		http.Error(w, "Ошибка при поиске жанров", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(genres)
+}

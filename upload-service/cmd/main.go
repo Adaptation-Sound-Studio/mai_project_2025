@@ -44,20 +44,16 @@ func main() {
 		log.Fatalf("Ошибка подключения к Elasticsearch: %v", err)
 	}
 
-	// убрать после того как вставим в какой-нибудь service
-	res, err := elasticClient.Info()
-	if err != nil {
-		log.Fatalf("Elasticsearch не отвечает: %v", err)
+	if err := elastic.CreateAllIndices(elasticClient); err != nil {
+		log.Printf("Ошибка при создании индексов: %v", err)
 	}
-	defer res.Body.Close()
-	log.Println("Успешно подключено к Elasticsearch")
 
 	genreRepo := repository.NewGenreRepository(db)
 	artistRepo := repository.NewArtistRepository(db)
 	songRepo := repository.NewSongRepository(db)
 	albumRepo := repository.NewAlbumRepository(db)
 
-	genreService := service.NewGenreService(genreRepo, kafkaProducer)
+	genreService := service.NewGenreService(genreRepo, kafkaProducer, elasticClient)
 	artistService := service.NewArtistService(artistRepo, cfg.AuthService.URL, cfg.AuthService.APIKey, kafkaProducer)
 	songService := service.NewSongService(songRepo, minioClient, minioBucket, kafkaProducer)
 	albumService := service.NewAlbumService(db, albumRepo)
