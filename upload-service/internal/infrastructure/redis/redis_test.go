@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"context"
 	"encoding/json"
 	"strconv"
 	"testing"
@@ -14,8 +15,9 @@ import (
 
 func SetupTestRedis(t *testing.T) *redis.Client {
 	cfg := &config.RedisConfig{
-		Host: "localhost",
-		Port: "6379",
+		Host:     "localhost",
+		Port:     "6379",
+		Password: "Rbkkth3920",
 	}
 	client := NewRedisClient(cfg)
 
@@ -34,10 +36,18 @@ func TestSetAndGetArtistID(t *testing.T) {
 	}
 	rdb := SetupTestRedis(t)
 
+	ctx := context.Background()
 	userID := "testuser"
 	artistID := int64(42)
 
-	err := SetArtistID(rdb, userID, strconv.FormatInt(artistID, 10))
+	initialSession := map[string]interface{}{
+		"user_id": 123,
+	}
+	raw, _ := json.Marshal(initialSession)
+	err := rdb.Set(ctx, userID, raw, 0).Err()
+	require.NoError(t, err)
+
+	err = SetArtistID(rdb, userID, strconv.FormatInt(artistID, 10))
 	require.NoError(t, err)
 
 	got, err := GetArtistID(rdb, userID)
@@ -53,7 +63,6 @@ func TestGetUserID(t *testing.T) {
 
 	sessionID := "admintoken"
 
-	// Подготовим корректное JSON-значение с полем user_id
 	session := map[string]interface{}{
 		"user_id": 44,
 	}
@@ -72,9 +81,12 @@ func TestGetUserRole_Found(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
+
+	ctx := context.Background()
 	rdb := SetupTestRedis(t)
 
-	err := rdb.Set(ctx, "role:55", "artist", 0).Err()
+	sessionJSON := `{"role":"artist"}`
+	err := rdb.Set(ctx, "55", sessionJSON, 0).Err()
 	require.NoError(t, err)
 
 	role, err := GetUserRole(rdb, "55")
@@ -90,5 +102,5 @@ func TestGetUserRole_NotFound(t *testing.T) {
 
 	_, err := GetUserRole(rdb, "unknown")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "роль не найдена")
+	assert.Contains(t, err.Error(), "не найдена")
 }
