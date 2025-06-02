@@ -94,15 +94,6 @@ func CreateAllIndices(client *elasticsearch.Client) error {
   }
  }`
 
-	genreMapping := `{
-		"mappings": {
-			"properties": {
-				"genre_id": { "type": "long" },
-				"name": { "type": "text" }
-			}
-		}
-	}`
-
 	if err := CreateIndex(client, "songs", songMapping); err != nil {
 		fmt.Println("Индекс songs: ", err)
 	}
