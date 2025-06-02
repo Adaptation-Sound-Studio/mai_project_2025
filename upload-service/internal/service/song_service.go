@@ -77,24 +77,6 @@ func (s *SongService) GetSongByID(ctx context.Context, id int64) (*response.Song
 		return nil, ErrSongNotFound
 	}
 
-	if song.NameOfMinio != "" {
-		presignedURL, err := s.minioClient.PresignedGetObject(
-			ctx,
-			s.bucketName,
-			song.NameOfMinio,
-			time.Minute*10,
-			nil,
-		)
-		if err != nil {
-			log.Printf("Ошибка при генерации ссылки на файл %s: %v", song.NameOfMinio, err)
-		} else {
-
-			url := presignedURL.String()
-
-			song.URL = url
-		}
-	}
-
 	artists, err := s.repo.GetArtistsBySongID(ctx, song.SongID)
 	if err != nil {
 		log.Printf("Ошибка при получении артистов для песни с ID %d: %v", song.SongID, err)
