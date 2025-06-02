@@ -9,20 +9,24 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"upload-service/internal/domain/artist"
 	"upload-service/internal/domain/event"
 	"upload-service/internal/domain/model"
 	"upload-service/internal/domain/response"
 	"upload-service/internal/kafka"
+
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 var ErrArtistNotFound = errors.New("артист не найден")
 
 type ArtistService struct {
-	repo        artist.Repository
-	authBaseURL string
-	apiKey      string
-	producer    *kafka.Producer
+	repo          artist.Repository
+	authBaseURL   string
+	apiKey        string
+	producer      *kafka.Producer
+	elasticClient *elasticsearch.Client
 }
 
 type roleUpdateRequest struct {
@@ -30,12 +34,13 @@ type roleUpdateRequest struct {
 	Role   string `json:"role"`
 }
 
-func NewArtistService(r artist.Repository, authBaseURL, apiKey string, producer *kafka.Producer) *ArtistService {
+func NewArtistService(r artist.Repository, authBaseURL, apiKey string, producer *kafka.Producer, elasticClient *elasticsearch.Client) *ArtistService {
 	return &ArtistService{
-		repo:        r,
-		authBaseURL: authBaseURL,
-		apiKey:      apiKey,
-		producer:    producer,
+		repo:          r,
+		authBaseURL:   authBaseURL,
+		apiKey:        apiKey,
+		producer:      producer,
+		elasticClient: elasticClient,
 	}
 }
 
@@ -140,7 +145,36 @@ func (s *ArtistService) RegisterArtist(ctx context.Context, artist *model.Artist
 		log.Printf("Ошибка отправки события artist_created: %v", err)
 	}
 
+	if err := s.indexArtist(ctx, artist); err != nil {
+		log.Printf("Ошибка индексации артиста в Elasticsearch: %v", err)
+	}
+
 	return artistID, nil
+}
+
+func (s *ArtistService) indexArtist(ctx context.Context, artist *model.Artist) error {
+	body := fmt.Sprintf(`{
+		"artist_id": %d,
+		"name": "%s",
+		"user_id": %d
+	}`, artist.ArtistID, artist.Name, artist.UserID)
+
+	res, err := s.elasticClient.Index(
+		"artists",
+		strings.NewReader(body),
+		s.elasticClient.Index.WithDocumentID(fmt.Sprint(artist.ArtistID)),
+		s.elasticClient.Index.WithContext(ctx),
+		s.elasticClient.Index.WithRefresh("true"),
+	)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("ошибка индексирования артиста: %s", res.String())
+	}
+	return nil
 }
 
 func (s *ArtistService) UpdateArtist(ctx context.Context, artist *model.Artist) error {
@@ -179,4 +213,47 @@ func (s *ArtistService) GetArtistIDByUserID(ctx context.Context, userID int64) (
 		return "", nil
 	}
 	return strconv.FormatInt(artist.ArtistID, 10), nil
+}
+
+func (s *ArtistService) SearchArtists(ctx context.Context, query string) ([]model.Artist, error) {
+	log.Println("SearchArtists hit with query:", query)
+
+	res, err := s.elasticClient.Search(
+		s.elasticClient.Search.WithContext(ctx),
+		s.elasticClient.Search.WithIndex("artists"),
+		s.elasticClient.Search.WithBody(strings.NewReader(fmt.Sprintf(`{
+			"query": {
+				"match": {
+					"name": {
+						"query": "%s",
+						"fuzziness": "AUTO"
+					}
+				}
+			}
+		}`, query))),
+		s.elasticClient.Search.WithPretty(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	var result struct {
+		Hits struct {
+			Hits []struct {
+				Source model.Artist `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	artists := make([]model.Artist, 0, len(result.Hits.Hits))
+	for _, hit := range result.Hits.Hits {
+		artists = append(artists, hit.Source)
+	}
+
+	return artists, nil
 }

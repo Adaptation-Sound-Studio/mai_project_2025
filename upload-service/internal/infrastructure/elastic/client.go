@@ -53,37 +53,46 @@ func CreateIndex(client *elasticsearch.Client, indexName string, mapping string)
 
 func CreateAllIndices(client *elasticsearch.Client) error {
 	songMapping := `{
-		"mappings": {
-			"properties": {
-				"song_id": { "type": "long" },
-				"name": { "type": "text" },
-				"genre": { "type": "keyword" },
-				"date": { "type": "date" }
-			}
-		}
-	}`
+  "mappings": {
+   "properties": {
+    "song_id": { "type": "long" },
+    "name": { "type": "text" },
+    "genre": { "type": "keyword" },
+    "date": { "type": "date" }
+   }
+  }
+ }`
 
 	albumMapping := `{
-		"mappings": {
-			"properties": {
-				"album_id": { "type": "long" },
-				"name": { "type": "text" },
-				"artist_id": { "type": "long" },
-				"genre": { "type": "keyword" },
-				"date": { "type": "date" }
-			}
-		}
-	}`
+  "mappings": {
+   "properties": {
+    "album_id": { "type": "long" },
+    "name": { "type": "text" },
+    "artist_id": { "type": "long" },
+    "genre": { "type": "keyword" },
+    "date": { "type": "date" }
+   }
+  }
+ }`
 
 	artistMapping := `{
-		"mappings": {
-			"properties": {
-				"artist_id": { "type": "long" },
-				"name": { "type": "text" },
-				"user_id": { "type": "long" }
-			}
-		}
-	}`
+  "mappings": {
+   "properties": {
+    "artist_id": { "type": "long" },
+    "name": { "type": "text" },
+    "user_id": { "type": "long" }
+   }
+  }
+ }`
+
+	genreMapping := `{
+  "mappings": {
+   "properties": {
+    "genre_id": { "type": "long" },
+    "name": { "type": "text" }
+   }
+  }
+ }`
 
 	genreMapping := `{
 		"mappings": {
