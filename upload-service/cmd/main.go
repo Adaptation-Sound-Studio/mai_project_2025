@@ -56,7 +56,7 @@ func main() {
 	genreService := service.NewGenreService(genreRepo, kafkaProducer, elasticClient)
 	artistService := service.NewArtistService(artistRepo, cfg.AuthService.URL, cfg.AuthService.APIKey, kafkaProducer, elasticClient)
 	songService := service.NewSongService(songRepo, minioClient, minioBucket, kafkaProducer, elasticClient)
-	albumService := service.NewAlbumService(db, albumRepo)
+	albumService := service.NewAlbumService(db, albumRepo, elasticClient)
 
 	genreHandler := handler.NewGenreHandler(genreService)
 	artistHandler := handler.NewArtistHandler(artistService, redisClient)

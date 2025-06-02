@@ -14,4 +14,6 @@ type Repository interface {
 	GetSongsByAlbumID(ctx context.Context, albumID int64) ([]model.Song, error)
 	CreateAlbum(ctx context.Context, tx *sql.Tx, album *model.Album) (int64, error)
 	UpdateAlbum(ctx context.Context, album *model.Album) error
+	GetGenreByAlbumID(ctx context.Context, albumID int64) (*model.Genre, error)
+	GetArtistByAlbumID(ctx context.Context, albumID int64) (*model.Artist, error)
 }

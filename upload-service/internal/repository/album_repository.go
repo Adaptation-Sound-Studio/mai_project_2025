@@ -153,3 +153,39 @@ func (r *albumRepository) BatchInsertSongsToAlbum(ctx context.Context, tx *sql.T
 	_, err := tx.ExecContext(ctx, query, args...)
 	return err
 }
+
+func (r *albumRepository) GetGenreByAlbumID(ctx context.Context, albumID int64) (*model.Genre, error) {
+	row := r.db.QueryRowContext(ctx,
+		`SELECT g.genre_id, g.name
+		 FROM genres g
+		 JOIN albums a ON g.genre_id = a.genre_id
+		 WHERE a.album_id = $1`, albumID)
+
+	var genre model.Genre
+	err := row.Scan(&genre.GenreID, &genre.Name)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &genre, nil
+}
+
+func (r *albumRepository) GetArtistByAlbumID(ctx context.Context, albumID int64) (*model.Artist, error) {
+	row := r.db.QueryRowContext(ctx,
+		`SELECT ar.artist_id, ar.name
+		 FROM artists ar
+		 JOIN albums al ON ar.artist_id = al.artist_id
+		 WHERE al.album_id = $1`, albumID)
+
+	var artist model.Artist
+	err := row.Scan(&artist.ArtistID, &artist.Name)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &artist, nil
+}
