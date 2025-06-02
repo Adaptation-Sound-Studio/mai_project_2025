@@ -70,7 +70,6 @@ func CreateAllIndices(client *elasticsearch.Client) error {
     "name": { "type": "text" },
     "artist_id": { "type": "long" },
     "genre": { "type": "keyword" },
-    "date": { "type": "date" }
    }
   }
  }`
