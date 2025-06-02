@@ -7,9 +7,14 @@ import (
 )
 
 type Config struct {
-	DB    DBConfig
-	Admin AdminConfig
-	Kafka KafkaConfig
+	DB     DBConfig
+	Admin  AdminConfig
+	Kafka  KafkaConfig
+	Server ServerConfig
+}
+
+type ServerConfig struct {
+	Port string
 }
 
 type DBConfig struct {
@@ -53,6 +58,9 @@ func LoadConfig() *Config {
 		Kafka: KafkaConfig{
 			Brokers: splitEnv("KAFKA_BROKERS"),
 			Topic:   os.Getenv("KAFKA_TOPIC"),
+		},
+		Server: ServerConfig{
+			Port: os.Getenv("ANAL_SERVER_PORT"),
 		},
 	}
 }
