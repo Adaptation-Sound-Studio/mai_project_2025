@@ -17,11 +17,11 @@ import (
 
 type GenreService struct {
 	repo          genre.Repository
-	producer      *kafka.Producer
+	producer      kafka.ProducerIface
 	elasticClient *elasticsearch.Client
 }
 
-func NewGenreService(r genre.Repository, producer *kafka.Producer, elasticClient *elasticsearch.Client) *GenreService {
+func NewGenreService(r genre.Repository, producer kafka.ProducerIface, elasticClient *elasticsearch.Client) *GenreService {
 	return &GenreService{
 		repo:          r,
 		producer:      producer,
@@ -69,6 +69,9 @@ func (s *GenreService) CreateGenre(ctx context.Context, genre *model.Genre) (int
 }
 
 func (s *GenreService) indexGenre(ctx context.Context, genre *model.Genre) error {
+	if s.elasticClient == nil {
+		return nil
+	}
 	body := fmt.Sprintf(`{"genre_id": %d, "name": "%s"}`, genre.GenreID, genre.Name)
 
 	res, err := s.elasticClient.Index(

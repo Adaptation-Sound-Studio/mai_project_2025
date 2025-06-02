@@ -15,3 +15,11 @@ func NewArtistService(repo artist.ArtistRepository) *ArtistService {
 func (s *ArtistService) CreateArtist(artist *artist.Artist) error {
 	return s.Repo.Create(artist)
 }
+
+func (s *ArtistService) GetTopArtistsForUser(userID int, limit int) ([]artist.Artist, error) {
+	return s.Repo.GetTopArtistsForUser(userID, limit)
+}
+
+func (s *ArtistService) GetMostPopularArtists(limit int) ([]artist.Artist, error) {
+	return s.Repo.GetMostPopularArtists(limit)
+}

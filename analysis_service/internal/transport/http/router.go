@@ -31,7 +31,17 @@ func NewRouter(db *sql.DB, adminSecret string) *mux.Router {
 	router.HandleFunc("/songs", songHandler.CreateSong).Methods("POST")
 	router.HandleFunc("/genres", genreHandler.CreateGenre).Methods("POST")
 	router.HandleFunc("/facts", factHandler.CreateFact).Methods("POST")
-	router.HandleFunc("/songs/popular", songHandler.GetPopularSongs).Methods("GET")
+	router.HandleFunc("/songs/admin-popular", songHandler.GetPopularSongs).Methods("GET")
+	router.HandleFunc("/users/{user_id:[0-9]+}/top-artists", artistHandler.GetTopArtistsForUser).Methods("GET")
+	router.HandleFunc("/users/{user_id:[0-9]+}/top-genres", genreHandler.GetTopGenresForUser).Methods("GET")
+	router.HandleFunc("/users/{user_id:[0-9]+}/top-songs", songHandler.GetTopSongsForUser).Methods("GET")
+	router.HandleFunc("/artists/popular", artistHandler.GetMostPopularArtists).Methods("GET")
+	router.HandleFunc("/songs/popular", songHandler.GetMostPopularSongs).Methods("GET")
+	router.HandleFunc("/genres/popular", genreHandler.GetMostPopularGenres).Methods("GET")
+	router.HandleFunc("/genres/top/night", genreHandler.GetTopGenresAtNight).Methods("GET")
+	router.HandleFunc("/genres/top/morning", genreHandler.GetTopGenresInMorning).Methods("GET")
+	router.HandleFunc("/genres/top/day", genreHandler.GetTopGenresInDay).Methods("GET")
+	router.HandleFunc("/genres/top/evening", genreHandler.GetTopGenresInEvening).Methods("GET")
 
 	return router
 }
