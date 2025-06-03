@@ -115,7 +115,13 @@ func (r *albumRepository) GetSongsByAlbumID(ctx context.Context, albumID int64) 
 }
 
 func (r *albumRepository) CheckSongsExist(ctx context.Context, tx *sql.Tx, songIDs []int64) ([]int64, error) {
-	query := "SELECT song_id FROM songs WHERE song_id = ANY($1)"
+
+	if len(songIDs) == 0 {
+		return nil, nil
+	}
+
+	query := "SELECT song_id FROM songs WHERE song_id = ANY($1::bigint[])"
+
 	rows, err := tx.QueryContext(ctx, query, pq.Array(songIDs))
 	if err != nil {
 		return nil, err
@@ -133,23 +139,88 @@ func (r *albumRepository) CheckSongsExist(ctx context.Context, tx *sql.Tx, songI
 	return existingIDs, rows.Err()
 }
 
+func (r *albumRepository) CheckSongsBelongToArtist(ctx context.Context, tx *sql.Tx, artistID int64, songIDs []int64) ([]int64, error) {
+	if len(songIDs) == 0 {
+		return nil, nil
+	}
+
+	query := `
+		SELECT song_id
+		FROM song_artist
+		WHERE artist_id = $1 AND song_id = ANY($2::bigint[])
+	`
+	rows, err := tx.QueryContext(ctx, query, artistID, pq.Array(songIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var owned []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		owned = append(owned, id)
+	}
+	return owned, nil
+}
+
 func (r *albumRepository) BatchInsertSongsToAlbum(ctx context.Context, tx *sql.Tx, albumID int64, songIDs []int64) error {
 	if len(songIDs) == 0 {
 		return nil
 	}
-
 	if len(songIDs) > 50 {
 		return fmt.Errorf("нельзя добавить более 50 песен в альбом")
 	}
 
-	var placeholders []string
-	var args []interface{}
+	var (
+		placeholders []string
+		args         []interface{}
+	)
+
 	for i, songID := range songIDs {
 		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d)", i*2+1, i*2+2))
 		args = append(args, songID, albumID)
 	}
 
-	query := fmt.Sprintf("INSERT INTO song_album (song_id, album_id) VALUES %s", strings.Join(placeholders, ", "))
+	query := fmt.Sprintf("INSERT INTO song_album (song_id, album_id) VALUES %s", strings.Join(placeholders, ","))
 	_, err := tx.ExecContext(ctx, query, args...)
 	return err
+}
+
+func (r *albumRepository) GetGenreByAlbumID(ctx context.Context, albumID int64) (*model.Genre, error) {
+	row := r.db.QueryRowContext(ctx,
+		`SELECT g.genre_id, g.name
+		 FROM genres g
+		 JOIN albums a ON g.genre_id = a.genre_id
+		 WHERE a.album_id = $1`, albumID)
+
+	var genre model.Genre
+	err := row.Scan(&genre.GenreID, &genre.Name)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &genre, nil
+}
+
+func (r *albumRepository) GetArtistByAlbumID(ctx context.Context, albumID int64) (*model.Artist, error) {
+	row := r.db.QueryRowContext(ctx,
+		`SELECT ar.artist_id, ar.name
+		 FROM artists ar
+		 JOIN albums al ON ar.artist_id = al.artist_id
+		 WHERE al.album_id = $1`, albumID)
+
+	var artist model.Artist
+	err := row.Scan(&artist.ArtistID, &artist.Name)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &artist, nil
 }

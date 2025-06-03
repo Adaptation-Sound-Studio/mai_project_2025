@@ -26,11 +26,11 @@ type SongService struct {
 	repo          song.Repository
 	minioClient   *minio.Client
 	bucketName    string
-	producer      *kafka.Producer
+	producer      kafka.ProducerIface
 	elasticClient *elasticsearch.Client
 }
 
-func NewSongService(r song.Repository, minioClient *minio.Client, bucketName string, producer *kafka.Producer, elasticClient *elasticsearch.Client) *SongService {
+func NewSongService(r song.Repository, minioClient *minio.Client, bucketName string, producer kafka.ProducerIface, elasticClient *elasticsearch.Client) *SongService {
 	return &SongService{
 		repo:          r,
 		minioClient:   minioClient,
@@ -122,74 +122,78 @@ func (s *SongService) CreateSong(ctx context.Context, song *model.Song, artistID
 	}
 
 	song.Auditions = 0
+	if s.minioClient != nil && file != nil {
+		objectName := generateUniqueFilename(filename)
+		_, err = s.minioClient.PutObject(ctx, s.bucketName, objectName, file, -1, minio.PutObjectOptions{
+			ContentType: "audio/mpeg",
+		})
+		if err != nil {
+			log.Printf("Ошибка при загрузке файла в MinIO: %v", err)
+			return err
+		}
 
-	objectName := generateUniqueFilename(filename)
-	_, err = s.minioClient.PutObject(ctx, s.bucketName, objectName, file, -1, minio.PutObjectOptions{
-		ContentType: "audio/mpeg",
-	})
-	if err != nil {
-		log.Printf("Ошибка при загрузке файла в MinIO: %v", err)
-		return err
+		song.NameOfMinio = objectName
+		song.Auditions = 0
+
+		log.Printf("Файл успешно загружен в MinIO: %s", objectName)
+
+		songID, err := s.repo.CreateSongWithArtists(ctx, song, artistIDs)
+		if err != nil {
+			log.Printf("Ошибка при создании песни: %v", err)
+			return err
+		}
+
+		song.SongID = songID
+		songEvent := event.SongCreatedEvent{
+			ID:   songID,
+			Name: song.Name,
+		}
+
+		err = s.producer.SendWrappedEvent("song_created", songEvent)
+		if err != nil {
+			log.Printf("Ошибка при отправке события song_created: %v", err)
+		}
+
+		artistObj, err := s.repo.GetOneArtistBySongID(ctx, songID)
+		if err != nil {
+			log.Printf("Ошибка получения артиста по песне: %v", err)
+		}
+		artist := ""
+		if artistObj != nil {
+			artist = artistObj.Name
+		}
+
+		genreObj, err := s.repo.GetGenreBySongID(ctx, songID)
+		if err != nil {
+			log.Printf("Ошибка получения жанра по песне: %v", err)
+		}
+		genre := ""
+		if genreObj != nil {
+			genre = genreObj.Name
+		}
+
+		songElastic := model.SongElastic{
+			SongID:      song.SongID,
+			Name:        song.Name,
+			NameOfMinio: song.NameOfMinio,
+			Auditions:   song.Auditions,
+			Genre:       genre,
+			Artist:      artist,
+		}
+
+		if err := s.indexSong(ctx, &songElastic); err != nil {
+			log.Printf("Ошибка индексации песни в Elasticsearch: %v", err)
+		}
+
+		log.Printf("Песня успешно создана с ID %d", songID)
 	}
-
-	song.NameOfMinio = objectName
-	song.Auditions = 0
-
-	log.Printf("Файл успешно загружен в MinIO: %s", objectName)
-
-	songID, err := s.repo.CreateSongWithArtists(ctx, song, artistIDs)
-	if err != nil {
-		log.Printf("Ошибка при создании песни: %v", err)
-		return err
-	}
-
-	song.SongID = songID
-	songEvent := event.SongCreatedEvent{
-		ID:   songID,
-		Name: song.Name,
-	}
-
-	err = s.producer.SendWrappedEvent("song_created", songEvent)
-	if err != nil {
-		log.Printf("Ошибка при отправке события song_created: %v", err)
-	}
-
-	artistObj, err := s.repo.GetOneArtistBySongID(ctx, songID)
-	if err != nil {
-		log.Printf("Ошибка получения артиста по песне: %v", err)
-	}
-	artist := ""
-	if artistObj != nil {
-		artist = artistObj.Name
-	}
-
-	genreObj, err := s.repo.GetGenreBySongID(ctx, songID)
-	if err != nil {
-		log.Printf("Ошибка получения жанра по песне: %v", err)
-	}
-	genre := ""
-	if genreObj != nil {
-		genre = genreObj.Name
-	}
-
-	songElastic := model.SongElastic{
-		SongID:      song.SongID,
-		Name:        song.Name,
-		NameOfMinio: song.NameOfMinio,
-		Auditions:   song.Auditions,
-		Genre:       genre,
-		Artist:      artist,
-	}
-
-	if err := s.indexSong(ctx, &songElastic); err != nil {
-		log.Printf("Ошибка индексации песни в Elasticsearch: %v", err)
-	}
-
-	log.Printf("Песня успешно создана с ID %d", songID)
 	return nil
 }
 
 func (s *SongService) indexSong(ctx context.Context, song *model.SongElastic) error {
+	if s.elasticClient == nil {
+		return nil
+	}
 	doc, err := json.Marshal(song)
 	if err != nil {
 		return fmt.Errorf("ошибка маршалинга JSON: %w", err)
@@ -260,6 +264,10 @@ func findMissingIDs(input, existing []int64) []int64 {
 		}
 	}
 	return missing
+}
+
+func (s *SongService) IncrementAuditions(ctx context.Context, songID int64) error {
+	return s.repo.IncrementAuditions(ctx, songID)
 }
 
 func (s *SongService) GetSongArtists(ctx context.Context, songID int64) ([]model.Artist, error) {

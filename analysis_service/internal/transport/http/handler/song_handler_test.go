@@ -29,6 +29,15 @@ func (m *MockSongRepo) GetPopularSongs(limit int) ([]song.PopularSong, error) {
 	return args.Get(0).([]song.PopularSong), args.Error(1)
 }
 
+func (m *MockSongRepo) GetTopSongsForUser(userID int, limit int) ([]song.Song, error) {
+	args := m.Called(userID, limit)
+	return args.Get(0).([]song.Song), args.Error(1)
+}
+
+func (m *MockSongRepo) GetMostPopularSongs(limit int) ([]song.Song, error) {
+	args := m.Called(limit)
+	return args.Get(0).([]song.Song), args.Error(1)
+}
 func TestCreateSong_Success(t *testing.T) {
 	mockRepo := &MockSongRepo{}
 	mockRepo.On("Create", mock.AnythingOfType("*song.Song")).Return(nil)
@@ -74,7 +83,7 @@ func TestCreateSong_Failure(t *testing.T) {
 	require.Contains(t, rec.Body.String(), "Invalid JSON")
 }
 
-func TestGetPopularSongs_Success(t *testing.T) {
+func TestGetSongsAdmin_Success(t *testing.T) {
 	mockRepo := &MockSongRepo{}
 	mockRepo.On("GetPopularSongs", 5).Return([]song.PopularSong{
 		{ID: 1, Name: "Top Hit", Artist: "I", Genre: "Pop", Listens: 123},
@@ -98,7 +107,7 @@ func TestGetPopularSongs_Success(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
-func TestGetPopularSongs_Failure(t *testing.T) {
+func TestGetSongsAdmin_Failure(t *testing.T) {
 	mockRepo := &MockSongRepo{}
 	mockRepo.On("GetPopularSongs", 5).Return([]song.PopularSong(nil), errors.New("db error"))
 
@@ -116,4 +125,94 @@ func TestGetPopularSongs_Failure(t *testing.T) {
 
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
 	require.Contains(t, rec.Body.String(), "Failed to fetch popular songs")
+}
+
+func TestGetTopSongsForUser_Success(t *testing.T) {
+	mockRepo := &MockSongRepo{}
+	userID := 42
+	limit := 3
+	mockRepo.On("GetTopSongsForUser", userID, limit).Return([]song.Song{
+		{ID: 1, Name: "Song One"},
+		{ID: 2, Name: "Song Two"},
+	}, nil)
+
+	service := service.NewSongService(mockRepo)
+	handler := NewSongHandler(service, "admin-secret")
+
+	router := mux.NewRouter()
+	router.HandleFunc("/users/{user_id}/top-songs", handler.GetTopSongsForUser).Methods("GET")
+
+	req := httptest.NewRequest(http.MethodGet, "/users/42/top-songs?limit=3", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), "Song One")
+
+	mockRepo.AssertExpectations(t)
+}
+
+func TestGetTopSongsForUser_Failure(t *testing.T) {
+	mockRepo := &MockSongRepo{}
+	userID := 42
+	limit := 3
+	mockRepo.On("GetTopSongsForUser", userID, limit).Return([]song.Song(nil), errors.New("db error"))
+
+	service := service.NewSongService(mockRepo)
+	handler := NewSongHandler(service, "admin-secret")
+
+	router := mux.NewRouter()
+	router.HandleFunc("/users/{user_id}/top-songs", handler.GetTopSongsForUser).Methods("GET")
+
+	req := httptest.NewRequest(http.MethodGet, "/users/42/top-songs?limit=3", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	require.Contains(t, rec.Body.String(), "Failed to get top songs")
+
+	mockRepo.AssertExpectations(t)
+}
+
+func TestGetMostPopularSongs_Success(t *testing.T) {
+	mockRepo := &MockSongRepo{}
+	limit := 10
+	mockRepo.On("GetMostPopularSongs", limit).Return([]song.Song{
+		{ID: 1, Name: "Popular Song"},
+		{ID: 2, Name: "Another Hit"},
+	}, nil)
+
+	service := service.NewSongService(mockRepo)
+	handler := NewSongHandler(service, "admin-secret")
+
+	req := httptest.NewRequest(http.MethodGet, "/songs/popular?limit=10", nil)
+	rec := httptest.NewRecorder()
+
+	handler.GetMostPopularSongs(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), "Popular Song")
+
+	mockRepo.AssertExpectations(t)
+}
+
+func TestGetMostPopularSongs_Failure(t *testing.T) {
+	mockRepo := &MockSongRepo{}
+	limit := 10
+	mockRepo.On("GetMostPopularSongs", limit).Return([]song.Song(nil), errors.New("db error"))
+
+	service := service.NewSongService(mockRepo)
+	handler := NewSongHandler(service, "admin-secret")
+
+	req := httptest.NewRequest(http.MethodGet, "/songs/popular?limit=10", nil)
+	rec := httptest.NewRecorder()
+
+	handler.GetMostPopularSongs(rec, req)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	require.Contains(t, rec.Body.String(), "Failed to get popular songs")
+
+	mockRepo.AssertExpectations(t)
 }

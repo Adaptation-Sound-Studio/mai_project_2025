@@ -7,6 +7,7 @@ import (
 	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/domain/artist"
 	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/testutils"
 	_ "github.com/lib/pq"
+	"github.com/stretchr/testify/require"
 )
 
 func TestArtistRepo_Create_Success(t *testing.T) {
@@ -51,4 +52,65 @@ func TestArtistRepo_Create_NameTooLong(t *testing.T) {
 	}
 
 	t.Logf("got expected error: %v", err)
+}
+
+func TestGetTopArtistsForUser_Repo(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	testutils.CleanTables(t, testutils.TestDB)
+
+	testutils.TestDB.Exec(`INSERT INTO songs (song_id, name) VALUES (1, 'Track')`)
+	testutils.TestDB.Exec(`INSERT INTO artists (artist_id, name) VALUES (1, 'Artist')`)
+	testutils.TestDB.Exec(`INSERT INTO genres (genre_id, name) VALUES (1, 'Genre')`)
+	_, err := testutils.TestDB.Exec(`
+    INSERT INTO fact_listens (user_id, song_id, artist_id, genre_id)
+    	VALUES ($1, $2, $3, $4)
+			`, 1, 1, 1, 1)
+
+	if err != nil {
+		return
+	}
+
+	userID := 1
+	limit := 5
+	repo := NewArtistRepo(testutils.TestDB)
+
+	artists, err := repo.GetTopArtistsForUser(userID, limit)
+	require.NoError(t, err)
+	require.NotNil(t, artists)
+	require.LessOrEqual(t, len(artists), limit)
+
+	for _, a := range artists {
+		t.Logf("Artist ID: %d, Name: %s", a.ID, a.Name)
+	}
+}
+
+func TestGetMostPopularArtists_Repo(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	testutils.CleanTables(t, testutils.TestDB)
+	testutils.TestDB.Exec(`INSERT INTO songs (song_id, name) VALUES (1, 'Track')`)
+	testutils.TestDB.Exec(`INSERT INTO artists (artist_id, name) VALUES (1, 'Artist')`)
+	testutils.TestDB.Exec(`INSERT INTO genres (genre_id, name) VALUES (1, 'Genre')`)
+	_, err := testutils.TestDB.Exec(`
+    INSERT INTO fact_listens (user_id, song_id, artist_id, genre_id)
+    	VALUES ($1, $2, $3, $4)
+			`, 1, 1, 1, 1)
+	if err != nil {
+		return
+	}
+
+	repo := NewArtistRepo(testutils.TestDB)
+
+	limit := 5
+	artists, err := repo.GetMostPopularArtists(limit)
+	require.NoError(t, err)
+	require.NotNil(t, artists)
+	require.LessOrEqual(t, len(artists), limit)
+
+	for _, a := range artists {
+		t.Logf("Artist ID: %d, Name: %s", a.ID, a.Name)
+	}
 }

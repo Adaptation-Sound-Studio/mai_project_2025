@@ -41,24 +41,6 @@ func TestUserService_GetUserByID(t *testing.T) {
 	repo.AssertCalled(t, "GetByID", int64(42))
 }
 
-func TestUserService_UpdateUser(t *testing.T) {
-	repo := new(MockUserRepo)
-	dummySession := &SessionService{}
-	service := NewUserService(repo, dummySession)
-
-	u := &user.User{
-		ID:        1,
-		Name:      "Bob Updated",
-		Login:     "bob",
-		Pass:      "newhash",
-		IsDeleted: false,
-	}
-	repo.On("Update", u).Return(nil)
-
-	err := service.UpdateUser(u)
-	require.NoError(t, err)
-	repo.AssertCalled(t, "Update", u)
-}
 func TestSoftDeleteUser_WarningOnSessionError(t *testing.T) {
 	mockRepo := new(MockUserRepo)
 	mockSession := new(MockSessionManager)

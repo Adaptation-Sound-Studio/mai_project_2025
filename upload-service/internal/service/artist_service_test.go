@@ -3,8 +3,18 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
+	"upload-service/internal/config"
 	"upload-service/internal/domain/model"
+	"upload-service/internal/infrastructure/elastic"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/stretchr/testify/assert"
@@ -65,6 +75,25 @@ func TestGetAllArtists_Success(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, expected, result)
+	repo.AssertExpectations(t)
+}
+
+func TestArtistService_GetAllArtists_Error(t *testing.T) {
+	repo := new(MockArtistRepo)
+	svc := NewArtistService(repo, "", "", nil, nil)
+
+	ctx := context.Background()
+
+	expectedErr := errors.New("db error")
+
+	repo.On("GetAllArtists", ctx).Return([]model.Artist{}, expectedErr)
+
+	artists, err := svc.GetAllArtists(ctx)
+
+	require.Error(t, err)
+	assert.Equal(t, expectedErr, err)
+	assert.Empty(t, artists)
+
 	repo.AssertExpectations(t)
 }
 
@@ -214,4 +243,198 @@ func TestGetArtistByID_ArtistNotFound(t *testing.T) {
 
 	assert.Equal(t, ErrArtistNotFound, err)
 	repo.AssertExpectations(t)
+}
+
+func TestSearchArtists_Integration(t *testing.T) {
+	cfg := &config.ElasticConfig{
+		URL:      "http://localhost:9200",
+		Username: os.Getenv("ELASTIC_USER"),
+		Password: os.Getenv("ELASTIC_PASS"),
+	}
+
+	esClient, err := elastic.NewElasticClient(cfg)
+	require.NoError(t, err)
+
+	service := &ArtistService{
+		elasticClient: esClient,
+	}
+
+	ctx := context.Background()
+
+	artist := model.Artist{
+		ArtistID: 9999,
+		Name:     "Electroman",
+		UserID:   1234,
+	}
+
+	body := fmt.Sprintf(`{"artist_id": %d, "name": "%s", "user_id": %d}`, artist.ArtistID, artist.Name, artist.UserID)
+	_, err = esClient.Index("artists", strings.NewReader(body),
+		esClient.Index.WithDocumentID(fmt.Sprint(artist.ArtistID)),
+		esClient.Index.WithRefresh("true"),
+	)
+	require.NoError(t, err)
+
+	results, err := service.SearchArtists(ctx, "Electroman")
+	require.NoError(t, err)
+
+	require.NotEmpty(t, results)
+
+	var found bool
+	for _, a := range results {
+		if a.ArtistID == artist.ArtistID && a.Name == artist.Name {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "Artist not found in search results")
+}
+
+func TestGetArtistIDByUserID(t *testing.T) {
+	ctx := context.Background()
+
+	topic := "artist-topic"
+	bucket := "test-bucket"
+
+	t.Run("artist found", func(t *testing.T) {
+		mockRepo := new(MockArtistRepo)
+		svc := NewArtistService(mockRepo, topic, bucket, nil, nil)
+
+		artist := &model.Artist{
+			ArtistID: 1234,
+			Name:     "Test Artist",
+			UserID:   1,
+		}
+
+		mockRepo.On("GetArtistByUserID", ctx, int64(1)).Return(artist, nil)
+
+		gotID, err := svc.GetArtistIDByUserID(ctx, 1)
+
+		assert.NoError(t, err)
+		assert.Equal(t, strconv.FormatInt(artist.ArtistID, 10), gotID)
+		mockRepo.AssertCalled(t, "GetArtistByUserID", ctx, int64(1))
+	})
+
+	t.Run("artist not found (nil result)", func(t *testing.T) {
+		mockRepo := new(MockArtistRepo)
+		svc := NewArtistService(mockRepo, topic, bucket, nil, nil)
+
+		mockRepo.On("GetArtistByUserID", ctx, int64(2)).Return((*model.Artist)(nil), nil)
+
+		gotID, err := svc.GetArtistIDByUserID(ctx, 2)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "", gotID)
+		mockRepo.AssertCalled(t, "GetArtistByUserID", ctx, int64(2))
+	})
+
+	t.Run("repository returns error", func(t *testing.T) {
+		mockRepo := new(MockArtistRepo)
+		svc := NewArtistService(mockRepo, topic, bucket, nil, nil)
+
+		mockRepo.On("GetArtistByUserID", ctx, int64(3)).Return((*model.Artist)(nil), errors.New("db error"))
+
+		gotID, err := svc.GetArtistIDByUserID(ctx, 3)
+
+		assert.Error(t, err)
+		assert.Equal(t, "", gotID)
+		mockRepo.AssertCalled(t, "GetArtistByUserID", ctx, int64(3))
+	})
+}
+func TestIndexArtist_Integration(t *testing.T) {
+	cfg := &config.ElasticConfig{
+		URL:      "http://localhost:9200",
+		Username: os.Getenv("ELASTIC_USER"),
+		Password: os.Getenv("ELASTIC_PASS"),
+	}
+
+	esClient, err := elastic.NewElasticClient(cfg)
+	require.NoError(t, err, "ошибка подключения к Elasticsearch")
+
+	svc := &ArtistService{
+		elasticClient: esClient,
+	}
+
+	ctx := context.Background()
+
+	artist := &model.Artist{
+		ArtistID: 123456789,
+		Name:     "Integration Test Artist",
+		UserID:   777,
+	}
+
+	err = svc.indexArtist(ctx, artist)
+	require.NoError(t, err, "ошибка при индексировании")
+
+	time.Sleep(1 * time.Second)
+
+	docID := fmt.Sprint(artist.ArtistID)
+	getResp, err := esClient.Get("artists", docID)
+	require.NoError(t, err)
+	defer getResp.Body.Close()
+
+	assert.False(t, getResp.IsError(), "документ не найден в индексе")
+
+	body, err := io.ReadAll(getResp.Body)
+	require.NoError(t, err)
+
+	assert.Contains(t, string(body), artist.Name)
+
+	_, _ = esClient.Delete("artists", docID)
+}
+
+func TestRegisterArtist_ErrorMarshalling(t *testing.T) {
+	repo := new(MockArtistRepo)
+	producer := new(MockProducer)
+
+	svc := &ArtistService{
+		repo:        repo,
+		producer:    nil,
+		authBaseURL: "http://fake-auth",
+		apiKey:      "test-key",
+	}
+
+	artist := &model.Artist{Name: "Test Artist"}
+
+	repo.On("GetArtistByUserID", mock.Anything, int64(42)).Return((*model.Artist)(nil), nil)
+	repo.On("CreateArtist", mock.Anything, artist, int64(42)).Return(int64(101), nil)
+
+	id, err := svc.RegisterArtist(context.Background(), artist, 42)
+
+	assert.Equal(t, int64(101), id)
+	assert.NoError(t, err)
+
+	producer.AssertNotCalled(t, "SendWrappedEvent")
+}
+func TestRegisterArtist_AuthServiceFailure(t *testing.T) {
+	repo := new(MockArtistRepo)
+	producer := new(MockProducer)
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer testServer.Close()
+
+	svc := &ArtistService{
+		repo:        repo,
+		producer:    producer,
+		authBaseURL: testServer.URL,
+		apiKey:      "fake",
+	}
+
+	artist := &model.Artist{Name: "AuthFail"}
+
+	repo.On("GetArtistByUserID", mock.Anything, int64(1)).
+		Return((*model.Artist)(nil), nil)
+
+	repo.On("CreateArtist", mock.Anything, artist, int64(1)).
+		Return(int64(10), nil)
+
+	producer.On("SendWrappedEvent", "artist_created", mock.Anything).
+		Return(nil)
+
+	id, err := svc.RegisterArtist(context.Background(), artist, 1)
+
+	assert.NoError(t, err)
+	assert.Equal(t, int64(10), id)
+	producer.AssertCalled(t, "SendWrappedEvent", "artist_created", mock.Anything)
 }

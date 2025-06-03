@@ -57,6 +57,15 @@ func (s *UserService) GetUserByID(id int64) (*user.User, error) {
 }
 
 func (s *UserService) UpdateUser(user *user.User) error {
+	checkUser, err := s.Repo.GetByID(user.ID)
+
+	if err != nil {
+		return fmt.Errorf("не удалось получить пользователя: %w", err)
+	}
+	if checkUser == nil {
+		return fmt.Errorf("пользователь с ID %d не найден", user.ID)
+	}
+
 	hashedPass, err := bcrypt.GenerateFromPassword([]byte(user.Pass), bcrypt.DefaultCost)
 	if err != nil {
 		return err

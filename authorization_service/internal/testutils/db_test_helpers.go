@@ -17,12 +17,9 @@ func CleanTables(t *testing.T, db *sql.DB) {
 	}
 
 	tables := []string{
-		"genres",
-		"artists",
-		"songs",
-		"albums",
-		"song_album",
-		"song_artist",
+		"users",
+		"roles",
+		"user_role",
 	}
 
 	for _, table := range tables {

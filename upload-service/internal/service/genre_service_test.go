@@ -2,12 +2,17 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
+	"strings"
 	"testing"
+	"upload-service/internal/config"
 	"upload-service/internal/domain/event"
 	"upload-service/internal/domain/model"
+	"upload-service/internal/infrastructure/elastic"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -36,17 +41,16 @@ type MockProducer struct {
 	mock.Mock
 }
 
-func (m *MockProducer) SendWrappedEvent(topic string, payload interface{}) error {
-	args := m.Called(topic, payload)
+func (m *MockProducer) SendWrappedEvent(eventType string, payload interface{}) error {
+	args := m.Called(eventType, payload)
 	return args.Error(0)
 }
 
 func TestCreateGenre_Success(t *testing.T) {
 	repo := new(MockGenreRepo)
 	producer := new(MockProducer)
-	es := &elasticsearch.Client{}
 
-	svc := NewGenreService(repo, nil, es)
+	svc := NewGenreService(repo, producer, nil)
 
 	genre := &model.Genre{Name: "Rock"}
 
@@ -174,4 +178,125 @@ func TestCreateGenre_DBError(t *testing.T) {
 	assert.Equal(t, int64(0), id)
 	assert.EqualError(t, err, "insert error")
 	repo.AssertExpectations(t)
+}
+
+func TestSearchGenres_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	cfg := &config.ElasticConfig{
+		URL:      "http://localhost:9200",
+		Username: os.Getenv("ELASTIC_USER"),
+		Password: os.Getenv("ELASTIC_PASS"),
+	}
+
+	esClient, err := elastic.NewElasticClient(cfg)
+	require.NoError(t, err)
+
+	service := &GenreService{
+		elasticClient: esClient,
+	}
+
+	body := `{"genre_id": 100, "name": "Electro"}`
+	_, err = esClient.Index(
+		"genres",
+		strings.NewReader(body),
+		esClient.Index.WithDocumentID("100"),
+		esClient.Index.WithRefresh("true"),
+	)
+	require.NoError(t, err)
+
+	results, err := service.SearchGenres(context.Background(), "Electro")
+	require.NoError(t, err)
+	require.NotEmpty(t, results)
+
+	found := false
+	for _, g := range results {
+		if g.Name == "Electro" && g.GenreID == 100 {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "Жанр 'Electro' не найден в результатах поиска")
+}
+
+func TestSearchGenres_Success(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	cfg := &config.ElasticConfig{
+		URL:      "http://localhost:9200",
+		Username: os.Getenv("ELASTIC_USER"),
+		Password: os.Getenv("ELASTIC_PASS"),
+	}
+
+	esClient, err := elastic.NewElasticClient(cfg)
+	require.NoError(t, err)
+
+	service := &GenreService{
+		elasticClient: esClient,
+	}
+
+	_, _ = esClient.Indices.Delete([]string{"genres"})
+
+	body := `{"genre_id": 200, "name": "Jazz Fusion"}`
+	_, err = esClient.Index(
+		"genres",
+		strings.NewReader(body),
+		esClient.Index.WithDocumentID("200"),
+		esClient.Index.WithRefresh("true"),
+	)
+	require.NoError(t, err)
+
+	results, err := service.SearchGenres(context.Background(), "Jazz")
+	require.NoError(t, err)
+	require.NotEmpty(t, results)
+
+	found := false
+	for _, g := range results {
+		if g.GenreID == 200 && g.Name == "Jazz Fusion" {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "Жанр 'Jazz Fusion' не найден в результатах поиска")
+}
+
+func TestIndexGenre_Integration(t *testing.T) {
+	cfg := &config.ElasticConfig{
+		URL:      "http://localhost:9200",
+		Username: os.Getenv("ELASTIC_USER"),
+		Password: os.Getenv("ELASTIC_PASS"),
+	}
+	esClient, err := elastic.NewElasticClient(cfg)
+	require.NoError(t, err)
+
+	service := &GenreService{
+		elasticClient: esClient,
+	}
+
+	ctx := context.Background()
+	genre := &model.Genre{
+		GenreID: 12345,
+		Name:    "TestGenre123",
+	}
+
+	err = service.indexGenre(ctx, genre)
+
+	require.NoError(t, err)
+
+	res, err := esClient.Get("genres", fmt.Sprint(genre.GenreID))
+	require.NoError(t, err)
+	defer res.Body.Close()
+
+	require.False(t, res.IsError(), "ожидалось, что документ будет найден")
+
+	var doc struct {
+		Source model.Genre `json:"_source"`
+	}
+	err = json.NewDecoder(res.Body).Decode(&doc)
+	require.NoError(t, err)
+
+	assert.Equal(t, genre.GenreID, doc.Source.GenreID)
+	assert.Equal(t, genre.Name, doc.Source.Name)
 }

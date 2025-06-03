@@ -38,10 +38,11 @@ func main() {
 	consumer := kafka.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.Topic, FactService, ArtistService, SongService, GenreService)
 	go consumer.Start(context.Background())
 
-	router := http.NewRouter(dbConn, cfg.Admin.Secret)
+	router := http.NewRouter(dbConn, cfg.Admin.Secret, cfg.ServiceApiKey)
 
-	log.Println("Сервер запущен на порту 8081")
-	if err := nethttp.ListenAndServe(":8081", router); err != nil {
+	port := cfg.Server.Port
+	log.Printf("Сервер запущен на порту %s", port)
+	if err := nethttp.ListenAndServe(":"+port, router); err != nil {
 		log.Fatalf("Ошибка запуска сервера: %v", err)
 	}
 }

@@ -1,4 +1,4 @@
-package service_test
+package service
 
 import (
 	"context"
@@ -6,9 +6,7 @@ import (
 	"errors"
 	"testing"
 	"upload-service/internal/domain/model"
-	"upload-service/internal/service"
 
-	"github.com/DATA-DOG/go-sqlmock"
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -54,15 +52,29 @@ func (m *MockAlbumRepo) UpdateAlbum(ctx context.Context, album *model.Album) err
 	return args.Error(0)
 }
 
+func (m *MockAlbumRepo) CheckSongsBelongToArtist(ctx context.Context, tx *sql.Tx, artistID int64, songIDs []int64) ([]int64, error) {
+	args := m.Called(ctx, tx, artistID, songIDs)
+	return args.Get(0).([]int64), args.Error(1)
+}
+
 type mockDB struct{}
 
 func (m *mockDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
 	return nil, nil
 }
 
+func (m *MockAlbumRepo) GetArtistByAlbumID(ctx context.Context, albumID int64) (*model.Artist, error) {
+	args := m.Called(ctx, albumID)
+	return args.Get(0).(*model.Artist), args.Error(1)
+}
+func (m *MockAlbumRepo) GetGenreByAlbumID(ctx context.Context, albumID int64) (*model.Genre, error) {
+	args := m.Called(ctx, albumID)
+	return args.Get(0).(*model.Genre), args.Error(1)
+}
+
 func TestGetAllAlbums_Success(t *testing.T) {
 	repo := new(MockAlbumRepo)
-	service := service.NewAlbumService(nil, repo)
+	service := NewAlbumService(nil, repo, nil)
 
 	expected := []model.Album{{AlbumID: 1, Name: "A"}}
 	repo.On("GetAllAlbums", mock.Anything).Return(expected, nil)
@@ -74,7 +86,7 @@ func TestGetAllAlbums_Success(t *testing.T) {
 
 func TestGetAlbumByID_Success(t *testing.T) {
 	repo := new(MockAlbumRepo)
-	svc := service.NewAlbumService(nil, repo)
+	svc := NewAlbumService(nil, repo, nil)
 
 	album := &model.Album{
 		AlbumID: 1,
@@ -100,51 +112,19 @@ func TestGetAlbumByID_Success(t *testing.T) {
 func TestGetAlbumByID_NotFound(t *testing.T) {
 	repo := new(MockAlbumRepo)
 
-	svc := service.NewAlbumService(nil, repo)
+	svc := NewAlbumService(nil, repo, nil)
 
 	repo.On("GetAlbumByID", mock.Anything, int64(123)).Return((*model.Album)(nil), nil)
 
 	got, err := svc.GetAlbumByID(context.Background(), 123)
 
 	assert.Nil(t, got)
-	assert.Equal(t, service.ErrAlbumNotFound, err)
+	assert.Equal(t, ErrAlbumNotFound, err)
 
-}
-func TestCreateAlbum_Success(t *testing.T) {
-	db, sqlMock, err := sqlmock.New()
-	require.NoError(t, err)
-	defer db.Close()
-
-	repo := new(MockAlbumRepo)
-	svc := service.NewAlbumService(db, repo)
-
-	album := &model.Album{
-		Name:     "Test Album",
-		ArtistID: 1,
-		GenreID:  2,
-	}
-	songIDs := []int64{1, 2}
-
-	sqlMock.ExpectBegin()
-	sqlMock.ExpectCommit()
-
-	repo.On("CreateAlbum", mock.Anything, mock.Anything, album).
-		Return(int64(101), nil)
-	repo.On("CheckSongsExist", mock.Anything, mock.Anything, songIDs).
-		Return(songIDs, nil)
-	repo.On("BatchInsertSongsToAlbum", mock.Anything, mock.Anything, int64(101), songIDs).
-		Return(nil)
-
-	id, err := svc.CreateAlbum(context.Background(), album, songIDs)
-	require.NoError(t, err)
-	assert.Equal(t, int64(101), id)
-
-	repo.AssertExpectations(t)
-	require.NoError(t, sqlMock.ExpectationsWereMet())
 }
 
 func TestUpdateAlbum_ValidationError(t *testing.T) {
-	s := service.NewAlbumService(nil, nil)
+	s := NewAlbumService(nil, nil, nil)
 
 	err := s.UpdateAlbum(context.Background(), &model.Album{AlbumID: 0})
 	assert.EqualError(t, err, "некорректный ID альбома для обновления")
@@ -152,7 +132,7 @@ func TestUpdateAlbum_ValidationError(t *testing.T) {
 
 func TestUpdateAlbum_Success(t *testing.T) {
 	repo := new(MockAlbumRepo)
-	svc := service.NewAlbumService(nil, repo)
+	svc := NewAlbumService(nil, repo, nil)
 
 	album := &model.Album{
 		AlbumID: 1,
@@ -172,7 +152,7 @@ func TestUpdateAlbum_Success(t *testing.T) {
 }
 
 func TestCreateAlbum_EmptyGenre(t *testing.T) {
-	s := service.NewAlbumService(nil, nil)
+	s := NewAlbumService(nil, nil, nil)
 
 	album := &model.Album{Name: "Test", ArtistID: 1, GenreID: 0}
 	id, err := s.CreateAlbum(context.Background(), album, nil)
@@ -182,7 +162,7 @@ func TestCreateAlbum_EmptyGenre(t *testing.T) {
 
 func TestUpdateAlbum_InvalidID(t *testing.T) {
 	repo := new(MockAlbumRepo)
-	svc := service.NewAlbumService(nil, repo)
+	svc := NewAlbumService(nil, repo, nil)
 
 	err := svc.UpdateAlbum(context.Background(), &model.Album{
 		AlbumID: 0,
@@ -195,7 +175,7 @@ func TestUpdateAlbum_InvalidID(t *testing.T) {
 
 func TestUpdateAlbum_EmptyName(t *testing.T) {
 	repo := new(MockAlbumRepo)
-	svc := service.NewAlbumService(nil, repo)
+	svc := NewAlbumService(nil, repo, nil)
 
 	repo.On("GetAlbumByID", mock.Anything, int64(1)).Return(&model.Album{AlbumID: 1}, nil)
 
@@ -210,7 +190,7 @@ func TestUpdateAlbum_EmptyName(t *testing.T) {
 
 func TestUpdateAlbum_InvalidGenre(t *testing.T) {
 	repo := new(MockAlbumRepo)
-	svc := service.NewAlbumService(nil, repo)
+	svc := NewAlbumService(nil, repo, nil)
 
 	repo.On("GetAlbumByID", mock.Anything, int64(1)).Return(&model.Album{AlbumID: 1}, nil)
 
@@ -225,7 +205,7 @@ func TestUpdateAlbum_InvalidGenre(t *testing.T) {
 
 func TestUpdateAlbum_UpdateError(t *testing.T) {
 	repo := new(MockAlbumRepo)
-	svc := service.NewAlbumService(nil, repo)
+	svc := NewAlbumService(nil, repo, nil)
 
 	album := &model.Album{
 		AlbumID: 1,

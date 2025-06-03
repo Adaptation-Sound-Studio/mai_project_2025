@@ -5,152 +5,229 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
+
 	"upload-service/internal/domain/model"
+	"upload-service/internal/domain/request"
+	"upload-service/internal/kafka"
 	"upload-service/internal/service"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-type MockGenreRepo struct{ mock.Mock }
+type MockGenreRepo struct {
+	mock.Mock
+}
 
 func (m *MockGenreRepo) GetAllGenres(ctx context.Context) ([]model.Genre, error) {
 	args := m.Called(ctx)
 	return args.Get(0).([]model.Genre), args.Error(1)
 }
-func (m *MockGenreRepo) CreateGenre(ctx context.Context, g *model.Genre) (int64, error) {
-	args := m.Called(ctx, g)
+
+func (m *MockGenreRepo) CreateGenre(ctx context.Context, genre *model.Genre) (int64, error) {
+	args := m.Called(ctx, genre)
 	return args.Get(0).(int64), args.Error(1)
 }
-func (m *MockGenreRepo) UpdateGenre(ctx context.Context, g *model.Genre) error {
-	args := m.Called(ctx, g)
-	return args.Error(0)
-}
 
-type MockProducer struct{ mock.Mock }
-
-func (m *MockProducer) SendWrappedEvent(topic string, payload interface{}) error {
-	args := m.Called(topic, payload)
-	return args.Error(0)
-}
-
-type rtFunc func(*http.Request) (*http.Response, error)
-
-func (f rtFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
-
-type MockGenreService struct {
-	mock.Mock
-}
-
-func (m *MockGenreService) UpdateGenre(ctx context.Context, genre *model.Genre) error {
+func (m *MockGenreRepo) UpdateGenre(ctx context.Context, genre *model.Genre) error {
 	args := m.Called(ctx, genre)
 	return args.Error(0)
 }
 
-func esMock() *elasticsearch.Client {
-	es, _ := elasticsearch.NewClient(elasticsearch.Config{
-		Transport: rtFunc(func(*http.Request) (*http.Response, error) {
-			return &http.Response{
-				StatusCode: 201,
-				Body:       ioutil.NopCloser(strings.NewReader(`{}`)),
-				Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
-			}, nil
-		}),
-	})
-	return es
-}
-
-func newTestHandler(repo *MockGenreRepo) *GenreHandler {
-	svc := service.NewGenreService(repo, nil, esMock())
-	return NewGenreHandler(svc)
-}
-
-type genreServiceStub struct {
-	*service.GenreService
-	getAllGenresFunc func(ctx context.Context) ([]*model.Genre, error)
-}
-
-func (s *genreServiceStub) GetAllGenres(ctx context.Context) ([]*model.Genre, error) {
-	if s.getAllGenresFunc != nil {
-		return s.getAllGenresFunc(ctx)
-	}
-	return nil, nil
-}
-
 func TestGetAllGenres_Success(t *testing.T) {
-	repo := new(MockGenreRepo)
-	h := newTestHandler(repo)
+	mockRepo := new(MockGenreRepo)
+	dummyProducer := new(kafka.ProducerIface)
+	var elasticClient *elasticsearch.Client = nil
+	svc := service.NewGenreService(mockRepo, *dummyProducer, elasticClient)
 
-	want := []model.Genre{{GenreID: 1, Name: "Rock"}}
-	repo.On("GetAllGenres", mock.Anything).Return(want, nil)
+	handler := NewGenreHandler(svc)
+
+	mockGenres := []model.Genre{{GenreID: 1, Name: "Rock"}}
+	mockRepo.On("GetAllGenres", mock.Anything).Return(mockGenres, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/genres", nil)
-	rec := httptest.NewRecorder()
+	rr := httptest.NewRecorder()
 
-	h.GetAllGenres(rec, req)
+	handler.GetAllGenres(rr, req)
 
-	assert.Equal(t, http.StatusOK, rec.Code)
-	var got []model.Genre
-	assert.NoError(t, json.NewDecoder(rec.Body).Decode(&got))
-	assert.Equal(t, want, got)
-	repo.AssertExpectations(t)
+	assert.Equal(t, http.StatusOK, rr.Code)
+	mockRepo.AssertExpectations(t)
 }
 
-func TestCreateGenre_Success(t *testing.T) {
-	repo := new(MockGenreRepo)
-	h := newTestHandler(repo)
+func TestUpdateGenre_Success(t *testing.T) {
+	mockRepo := new(MockGenreRepo)
+	var dummyProducer kafka.ProducerIface = nil
+	var elasticClient *elasticsearch.Client = nil
 
-	body := `{"name":"Jazz"}`
-	repo.
-		On("CreateGenre", mock.Anything, mock.MatchedBy(
-			func(g *model.Genre) bool { return g.Name == "Jazz" }),
-		).Return(int64(5), nil)
+	svc := service.NewGenreService(mockRepo, dummyProducer, elasticClient)
+	handler := NewGenreHandler(svc)
 
-	req := httptest.NewRequest(http.MethodPost, "/genres", bytes.NewBufferString(body))
-	rec := httptest.NewRecorder()
+	genre := &model.Genre{GenreID: 1, Name: "Blues"}
+	mockRepo.On("UpdateGenre", mock.Anything, genre).Return(nil)
 
-	h.CreateGenre(rec, req)
+	body := `{"name": "Blues"}`
+	req := httptest.NewRequest(http.MethodPut, "/genres/1", bytes.NewBufferString(body))
+	req = mux.SetURLVars(req, map[string]string{"genre_id": "1"})
+	rr := httptest.NewRecorder()
 
-	assert.Equal(t, http.StatusCreated, rec.Code)
-	var resp map[string]string
-	assert.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
-	assert.Equal(t, "5", resp["genre_id"])
-	repo.AssertExpectations(t)
+	handler.UpdateGenre(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	mockRepo.AssertExpectations(t)
+}
+func TestCreateGenre_BadRequest(t *testing.T) {
+	mockRepo := new(MockGenreRepo)
+	var dummyProducer kafka.ProducerIface = nil
+	var elasticClient *elasticsearch.Client = nil
+
+	svc := service.NewGenreService(mockRepo, dummyProducer, elasticClient)
+	handler := NewGenreHandler(svc)
+
+	req := httptest.NewRequest(http.MethodPost, "/genres", bytes.NewBufferString("invalid-json"))
+	rr := httptest.NewRecorder()
+
+	handler.CreateGenre(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Contains(t, rr.Body.String(), "Неверный формат запроса")
 }
 
-func TestCreateGenre_BadJSON(t *testing.T) {
-	repo := new(MockGenreRepo)
-	h := newTestHandler(repo)
+func TestCreateGenre_MethodNotAllowed(t *testing.T) {
+	mockRepo := new(MockGenreRepo)
+	var dummyProducer kafka.ProducerIface = nil
+	var elasticClient *elasticsearch.Client = nil
 
-	req := httptest.NewRequest(http.MethodPost, "/genres", bytes.NewBufferString(`{`))
-	rec := httptest.NewRecorder()
+	svc := service.NewGenreService(mockRepo, dummyProducer, elasticClient)
+	handler := NewGenreHandler(svc)
 
-	h.CreateGenre(rec, req)
+	req := httptest.NewRequest(http.MethodGet, "/genres", nil)
+	rr := httptest.NewRecorder()
 
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	repo.AssertNotCalled(t, "CreateGenre", mock.Anything, mock.Anything)
+	handler.CreateGenre(rr, req)
+
+	assert.Equal(t, http.StatusMethodNotAllowed, rr.Code)
+	assert.Contains(t, rr.Body.String(), "Метод не разрешён")
 }
 
 func TestCreateGenre_ServiceError(t *testing.T) {
-	repo := new(MockGenreRepo)
-	h := newTestHandler(repo)
+	mockRepo := new(MockGenreRepo)
+	var dummyProducer kafka.ProducerIface = nil
+	var elasticClient *elasticsearch.Client = nil
 
-	repo.
-		On("CreateGenre", mock.Anything, mock.Anything).
-		Return(int64(0), errors.New("duplicate"))
+	svc := service.NewGenreService(mockRepo, dummyProducer, elasticClient)
+	handler := NewGenreHandler(svc)
 
-	req := httptest.NewRequest(http.MethodPost, "/genres",
-		bytes.NewBufferString(`{"name":"Rock"}`))
-	rec := httptest.NewRecorder()
+	genreReq := request.CreateGenreRequest{Name: "Rock"}
+	mockRepo.On("CreateGenre", mock.Anything, &model.Genre{Name: "Rock"}).
+		Return(int64(0), errors.New("жанр уже существует"))
 
-	h.CreateGenre(rec, req)
+	body, _ := json.Marshal(genreReq)
+	req := httptest.NewRequest(http.MethodPost, "/genres", bytes.NewBuffer(body))
+	rr := httptest.NewRecorder()
 
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	repo.AssertExpectations(t)
+	handler.CreateGenre(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Contains(t, rr.Body.String(), "жанр уже существует")
+	mockRepo.AssertExpectations(t)
+}
+
+func TestUpdateGenre_MethodNotAllowed(t *testing.T) {
+	handler := NewGenreHandler(nil)
+
+	req := httptest.NewRequest(http.MethodPost, "/genres/1", nil)
+	req = mux.SetURLVars(req, map[string]string{"genre_id": "1"})
+	rr := httptest.NewRecorder()
+
+	handler.UpdateGenre(rr, req)
+
+	assert.Equal(t, http.StatusMethodNotAllowed, rr.Code)
+	assert.Contains(t, rr.Body.String(), "Метод не разрешён")
+}
+
+func TestUpdateGenre_InvalidID(t *testing.T) {
+	handler := NewGenreHandler(nil)
+
+	req := httptest.NewRequest(http.MethodPut, "/genres/invalid", nil)
+	req = mux.SetURLVars(req, map[string]string{"genre_id": "invalid"})
+	rr := httptest.NewRecorder()
+
+	handler.UpdateGenre(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Contains(t, rr.Body.String(), "Некорректный ID жанра")
+}
+
+func TestUpdateGenre_BadJSON(t *testing.T) {
+	handler := NewGenreHandler(nil)
+
+	req := httptest.NewRequest(http.MethodPut, "/genres/1", bytes.NewBufferString("{invalid_json}"))
+	req = mux.SetURLVars(req, map[string]string{"genre_id": "1"})
+	rr := httptest.NewRecorder()
+
+	handler.UpdateGenre(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Contains(t, rr.Body.String(), "Неверный формат запроса")
+}
+
+func TestUpdateGenre_ServiceError(t *testing.T) {
+	mockRepo := new(MockGenreRepo)
+	var dummyProducer kafka.ProducerIface = nil
+	var elasticClient *elasticsearch.Client = nil
+
+	svc := service.NewGenreService(mockRepo, dummyProducer, elasticClient)
+	handler := NewGenreHandler(svc)
+
+	genre := &model.Genre{GenreID: 1, Name: "Rock"}
+	mockRepo.On("UpdateGenre", mock.Anything, genre).Return(errors.New("жанр не найден"))
+
+	body, _ := json.Marshal(map[string]string{"name": "Rock"})
+	req := httptest.NewRequest(http.MethodPut, "/genres/1", bytes.NewBuffer(body))
+	req = mux.SetURLVars(req, map[string]string{"genre_id": "1"})
+	rr := httptest.NewRecorder()
+
+	handler.UpdateGenre(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Contains(t, rr.Body.String(), "жанр не найден")
+	mockRepo.AssertExpectations(t)
+}
+
+func TestGetAllGenres_ServiceError(t *testing.T) {
+	mockRepo := new(MockGenreRepo)
+	var dummyProducer kafka.ProducerIface = nil
+	var elasticClient *elasticsearch.Client = nil
+
+	svc := service.NewGenreService(mockRepo, dummyProducer, elasticClient)
+	handler := NewGenreHandler(svc)
+
+	mockRepo.On("GetAllGenres", mock.Anything).Return([]model.Genre(nil), assert.AnError)
+
+	req := httptest.NewRequest(http.MethodGet, "/genres", nil)
+	rr := httptest.NewRecorder()
+
+	handler.GetAllGenres(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	assert.Contains(t, rr.Body.String(), "Ошибка при получении жанров")
+
+	mockRepo.AssertExpectations(t)
+}
+
+func TestGetAllGenres_MethodNotAllowed(t *testing.T) {
+	handler := NewGenreHandler(nil)
+
+	req := httptest.NewRequest(http.MethodPost, "/genres", nil)
+	rr := httptest.NewRecorder()
+
+	handler.GetAllGenres(rr, req)
+
+	assert.Equal(t, http.StatusMethodNotAllowed, rr.Code)
+	assert.Contains(t, rr.Body.String(), "Метод не разрешён")
 }

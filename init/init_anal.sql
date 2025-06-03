@@ -32,23 +32,17 @@ CREATE TABLE IF NOT EXISTS fact_listens (
 CREATE INDEX idx_fact_listens_user_listened_at
     ON fact_listens (user_id, listened_at);
 
-INSERT INTO genres (name) VALUES
-  ('Pop'),
-  ('Rock'),
-  ('Jazz');
+INSERT INTO genres (name) VALUES ('Pop'), ('Rock'), ('Jazz');
 
-INSERT INTO artists (name) VALUES
-  ('Taylor Swift'),
-  ('Queen'),
-  ('Miles Davis');
+INSERT INTO artists (name) VALUES 
+  ('Artist One'),
+  ('Artist Two');
 
-INSERT INTO songs (name) VALUES
-  ('Love Story'),
-  ('Bohemian Rhapsody'),
-  ('So What');
+INSERT INTO songs (name) VALUES 
+  ('Song A'),
+  ('Song B');
 
 INSERT INTO fact_listens (user_id, song_id, artist_id, genre_id, listened_at) VALUES
-  (101, 1, 1, 1, '2025-06-01 10:00:00'),
-  (102, 2, 2, 2, '2025-06-01 10:05:00'),
-  (101, 3, 3, 3, '2025-06-01 10:10:00'),
-  (103, 1, 1, 1, '2025-06-01 10:15:00');
+  (1, 1, 1, 1, '2025-06-01 10:00:00'),
+  (2, 2, 2, 2, '2025-06-01 10:05:00'),
+  (3, 1, 1, 1, '2025-06-01 10:10:00');

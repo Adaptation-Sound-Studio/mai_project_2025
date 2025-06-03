@@ -3,10 +3,13 @@ package redis
 import (
 	"context"
 	"encoding/json"
+	"log"
+	"os"
 	"strconv"
 	"testing"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -14,14 +17,15 @@ import (
 )
 
 func SetupTestRedis(t *testing.T) *redis.Client {
+	err := godotenv.Load("C:/Users/User/Desktop/Project/mai_project_2025/.env")
 	cfg := &config.RedisConfig{
 		Host:     "localhost",
 		Port:     "6379",
-		Password: "Rbkkth3920",
+		Password: os.Getenv("REDIS_PASSWORD"),
 	}
 	client := NewRedisClient(cfg)
 
-	err := client.Ping(ctx).Err()
+	err = client.Ping(ctx).Err()
 	require.NoError(t, err, "Redis должен быть запущен локально на 6379")
 
 	err = client.FlushAll(ctx).Err()
@@ -103,4 +107,82 @@ func TestGetUserRole_NotFound(t *testing.T) {
 	_, err := GetUserRole(rdb, "unknown")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "не найдена")
+}
+
+func TestGetArtistID_Errors(t *testing.T) {
+	err := godotenv.Load("C:/Users/User/Desktop/Project/mai_project_2025/.env")
+	if err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
+	ctx := context.Background()
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: os.Getenv("REDIS_PASSWORD"),
+		DB:       0,
+	})
+	defer rdb.Close()
+
+	t.Run("session not found", func(t *testing.T) {
+		_, err := GetArtistID(rdb, "nonexistent_session")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "не найдена")
+	})
+
+	t.Run("invalid JSON in session", func(t *testing.T) {
+		sessionID := "bad_json"
+		rdb.Set(ctx, sessionID, "not_a_json", 0)
+		defer rdb.Del(ctx, sessionID)
+
+		_, err := GetArtistID(rdb, sessionID)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "не удалось распарсить")
+	})
+
+	t.Run("redis unavailable", func(t *testing.T) {
+		badRdb := redis.NewClient(&redis.Options{
+			Addr: "localhost:9999",
+		})
+		_, err := GetArtistID(badRdb, "any")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "ошибка при получении")
+	})
+}
+
+func TestSetArtistID_Errors(t *testing.T) {
+	err := godotenv.Load("C:/Users/User/Desktop/Project/mai_project_2025/.env")
+	if err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
+	ctx := context.Background()
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: os.Getenv("REDIS_PASSWORD"),
+		DB:       0,
+	})
+	defer rdb.Close()
+
+	t.Run("session not found", func(t *testing.T) {
+		err := SetArtistID(rdb, "nonexistent_session", "42")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "не найдена")
+	})
+
+	t.Run("invalid JSON in session", func(t *testing.T) {
+		sessionID := "bad_json"
+		require.NoError(t, rdb.Set(ctx, sessionID, "not_json", 0).Err())
+		defer rdb.Del(ctx, sessionID)
+
+		err := SetArtistID(rdb, sessionID, "42")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "не удалось распарсить")
+	})
+
+	t.Run("redis unavailable", func(t *testing.T) {
+		badRdb := redis.NewClient(&redis.Options{
+			Addr: "localhost:9999",
+		})
+		err := SetArtistID(badRdb, "any", "42")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "ошибка при получении")
+	})
 }

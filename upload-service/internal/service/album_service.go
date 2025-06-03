@@ -3,23 +3,32 @@ package service
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"upload-service/internal/domain/album"
 	"upload-service/internal/domain/model"
 	"upload-service/internal/domain/response"
+
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 var ErrAlbumNotFound = errors.New("альбом не найден")
 
 type AlbumService struct {
-	db   *sql.DB
-	repo album.Repository
+	db            *sql.DB
+	repo          album.Repository
+	elasticClient *elasticsearch.Client
 }
 
-func NewAlbumService(db *sql.DB, r album.Repository) *AlbumService {
-	return &AlbumService{db: db, repo: r}
+func NewAlbumService(db *sql.DB, r album.Repository, elasticClient *elasticsearch.Client) *AlbumService {
+	return &AlbumService{
+		db:            db,
+		repo:          r,
+		elasticClient: elasticClient,
+	}
 }
 
 func (s *AlbumService) GetAllAlbums(ctx context.Context) ([]model.Album, error) {
@@ -79,12 +88,12 @@ func (s *AlbumService) CreateAlbum(ctx context.Context, album *model.Album, song
 		}
 	}()
 
-	albumID, err := s.repo.CreateAlbum(ctx, tx, album)
+	existingSongIDs, err := s.repo.CheckSongsExist(ctx, tx, songIDs)
 	if err != nil {
 		return 0, err
 	}
 
-	existingSongIDs, err := s.repo.CheckSongsExist(ctx, tx, songIDs)
+	ownedSongIDs, err := s.repo.CheckSongsBelongToArtist(ctx, tx, album.ArtistID, songIDs)
 	if err != nil {
 		return 0, err
 	}
@@ -92,6 +101,17 @@ func (s *AlbumService) CreateAlbum(ctx context.Context, album *model.Album, song
 	missing := findMissingAlbumSongIDs(songIDs, existingSongIDs)
 	if len(missing) > 0 {
 		return 0, fmt.Errorf("песни с ID %v не существуют", missing)
+	}
+
+	notOwned := findMissingAlbumSongIDs(songIDs, ownedSongIDs)
+	if len(notOwned) > 0 {
+		return 0, fmt.Errorf("вы не можете добавить чужие песни: %v", notOwned)
+	}
+
+	album.Auditions = 0
+	albumID, err := s.repo.CreateAlbum(ctx, tx, album)
+	if err != nil {
+		return 0, err
 	}
 
 	if len(songIDs) > 0 {
@@ -104,8 +124,63 @@ func (s *AlbumService) CreateAlbum(ctx context.Context, album *model.Album, song
 		return 0, err
 	}
 
+	genreObj, err := s.repo.GetGenreByAlbumID(ctx, albumID)
+	if err != nil {
+		log.Printf("Ошибка получения жанра по альбому: %v", err)
+	}
+	genre := ""
+	if genreObj != nil {
+		genre = genreObj.Name
+	}
+
+	artistObj, err := s.repo.GetArtistByAlbumID(ctx, albumID)
+	if err != nil {
+		log.Printf("Ошибка получения артиста по альбому: %v", err)
+	}
+	artist := ""
+	if artistObj != nil {
+		artist = artistObj.Name
+	}
+
+	albumElastic := model.AlbumElastic{
+		AlbumID:   albumID,
+		Name:      album.Name,
+		Auditions: album.Auditions,
+		Genre:     genre,
+		Artist:    artist,
+		Date:      album.Date,
+	}
+
+	if err := s.indexAlbum(ctx, &albumElastic); err != nil {
+		log.Printf("Ошибка индексации альбома в Elasticsearch: %v", err)
+	}
+
 	log.Printf("Альбом успешно создан с ID %d", albumID)
 	return albumID, nil
+}
+
+func (s *AlbumService) indexAlbum(ctx context.Context, album *model.AlbumElastic) error {
+	doc, err := json.Marshal(album)
+	if err != nil {
+		return fmt.Errorf("ошибка маршалинга JSON: %w", err)
+	}
+
+	res, err := s.elasticClient.Index(
+		"albums",
+		strings.NewReader(string(doc)),
+		s.elasticClient.Index.WithDocumentID(fmt.Sprint(album.AlbumID)),
+		s.elasticClient.Index.WithContext(ctx),
+		s.elasticClient.Index.WithRefresh("true"),
+	)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("ошибка индексирования альбома: %s", res.String())
+	}
+	return nil
 }
 
 func (s *AlbumService) UpdateAlbum(ctx context.Context, album *model.Album) error {
@@ -149,4 +224,59 @@ func findMissingAlbumSongIDs(input, existing []int64) []int64 {
 		}
 	}
 	return missing
+}
+
+func (s *AlbumService) SearchAlbums(ctx context.Context, filters map[string]string) ([]model.AlbumElastic, error) {
+	mustClauses := []string{}
+
+	for field, value := range filters {
+		if value != "" {
+			mustClauses = append(mustClauses, fmt.Sprintf(`{
+				"match": {
+					"%s": {
+						"query": "%s",
+						"fuzziness": "AUTO"
+					}
+				}
+			}`, field, value))
+		}
+	}
+
+	body := fmt.Sprintf(`{
+		"query": {
+			"bool": {
+				"must": [%s]
+			}
+		}
+	}`, strings.Join(mustClauses, ","))
+
+	res, err := s.elasticClient.Search(
+		s.elasticClient.Search.WithContext(ctx),
+		s.elasticClient.Search.WithIndex("albums"),
+		s.elasticClient.Search.WithBody(strings.NewReader(body)),
+		s.elasticClient.Search.WithPretty(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	var result struct {
+		Hits struct {
+			Hits []struct {
+				Source model.AlbumElastic `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	album := make([]model.AlbumElastic, 0, len(result.Hits.Hits))
+	for _, hit := range result.Hits.Hits {
+		album = append(album, hit.Source)
+	}
+
+	return album, nil
 }

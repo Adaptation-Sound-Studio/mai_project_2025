@@ -159,3 +159,26 @@ func (h *AlbumHandler) UpdateAlbum(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "Альбом успешно обновлён"})
 }
+
+func (h *AlbumHandler) SearchAlbums(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Метод не разрешён", http.StatusMethodNotAllowed)
+		return
+	}
+
+	filters := map[string]string{
+		"name":   r.URL.Query().Get("name"),
+		"genre":  r.URL.Query().Get("genre"),
+		"artist": r.URL.Query().Get("artist"),
+	}
+
+	albums, err := h.Service.SearchAlbums(r.Context(), filters)
+	if err != nil {
+		log.Printf("Ошибка при поиске альбома: %v", err)
+		http.Error(w, "Ошибка при поиске альбома", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(albums)
+}

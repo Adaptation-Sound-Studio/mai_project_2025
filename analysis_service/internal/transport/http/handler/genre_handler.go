@@ -3,9 +3,11 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/domain/genre"
 	"github.com/Adaptation-Sound-Studio/mai_project_2025/analysis/analytics-service/internal/service"
+	"github.com/gorilla/mux"
 )
 
 type GenreHandler struct {
@@ -36,4 +38,121 @@ func (h *GenreHandler) CreateGenre(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(genre)
+}
+
+func (h *GenreHandler) GetTopGenresForUser(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userIDStr := vars["user_id"]
+
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	limit := 10
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if val, err := strconv.Atoi(l); err == nil && val > 0 {
+			limit = val
+		}
+	}
+
+	genres, err := h.Service.GetTopGenresForUser(userID, limit)
+	if err != nil {
+		http.Error(w, "Failed to get top genres", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(genres)
+}
+
+func (h *GenreHandler) GetMostPopularGenres(w http.ResponseWriter, r *http.Request) {
+	limit := 10
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if val, err := strconv.Atoi(l); err == nil && val > 0 {
+			limit = val
+		}
+	}
+
+	genres, err := h.Service.GetMostPopularGenres(limit)
+	if err != nil {
+		http.Error(w, "Failed to get popular genres", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(genres)
+}
+
+func (h *GenreHandler) GetTopGenresAtNight(w http.ResponseWriter, r *http.Request) {
+	limit := 10
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if val, err := strconv.Atoi(l); err == nil && val > 0 {
+			limit = val
+		}
+	}
+
+	genres, err := h.Service.GetTopGenresAtNight(limit)
+	if err != nil {
+		http.Error(w, "Failed to get top genres at night", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(genres)
+}
+
+func (h *GenreHandler) GetTopGenresInMorning(w http.ResponseWriter, r *http.Request) {
+	limit := 10
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if val, err := strconv.Atoi(l); err == nil && val > 0 {
+			limit = val
+		}
+	}
+
+	genres, err := h.Service.GetTopGenresInMorning(limit)
+	if err != nil {
+		http.Error(w, "Failed to get top genres in morning", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(genres)
+}
+
+func (h *GenreHandler) GetTopGenresInDay(w http.ResponseWriter, r *http.Request) {
+	limit := 10
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if val, err := strconv.Atoi(l); err == nil && val > 0 {
+			limit = val
+		}
+	}
+
+	genres, err := h.Service.GetTopGenresInDay(limit)
+	if err != nil {
+		http.Error(w, "Failed to get top genres in day", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(genres)
+}
+
+func (h *GenreHandler) GetTopGenresInEvening(w http.ResponseWriter, r *http.Request) {
+	limit := 10
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if val, err := strconv.Atoi(l); err == nil && val > 0 {
+			limit = val
+		}
+	}
+
+	genres, err := h.Service.GetTopGenresInEvening(limit)
+	if err != nil {
+		http.Error(w, "Failed to get top genres in evening", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(genres)
 }

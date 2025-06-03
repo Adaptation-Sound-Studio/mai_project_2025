@@ -28,11 +28,7 @@ INSERT INTO users (name, login, password) VALUES
   ('Bob Johnson', 'bob', '$2a$10$A/OiukfL8fbMpnC2mv.L6uD5OwooxR8oG3IxbMDZaSvm3vR8amn4e'),
   ('Charlie Brown', 'charlie', '$2a$10$A/OiukfL8fbMpnC2mv.L6uD5OwooxR8oG3IxbMDZaSvm3vR8amn4e');
 
-INSERT INTO roles (role) VALUES ('artist') ON CONFLICT DO NOTHING;
-INSERT INTO roles (role) VALUES ('admin') ON CONFLICT DO NOTHING;
+INSERT INTO roles (role) VALUES ('artist'), ('admin') ON CONFLICT DO NOTHING;
 
 INSERT INTO user_role (user_id, role_id) VALUES
-  (1, 1),  
-  (2, 2),  
-  (3, 1),  
-  (3, 2); 
+  (1, 1), (2, 2), (3, 1);

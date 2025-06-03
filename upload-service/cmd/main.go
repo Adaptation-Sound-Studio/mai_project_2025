@@ -56,7 +56,7 @@ func main() {
 	genreService := service.NewGenreService(genreRepo, kafkaProducer, elasticClient)
 	artistService := service.NewArtistService(artistRepo, cfg.AuthService.URL, cfg.AuthService.APIKey, kafkaProducer, elasticClient)
 	songService := service.NewSongService(songRepo, minioClient, minioBucket, kafkaProducer, elasticClient)
-	albumService := service.NewAlbumService(db, albumRepo)
+	albumService := service.NewAlbumService(db, albumRepo, elasticClient)
 
 	genreHandler := handler.NewGenreHandler(genreService)
 	artistHandler := handler.NewArtistHandler(artistService, redisClient)
@@ -72,7 +72,7 @@ func main() {
 		cfg,
 	)
 
-	port := "8082"
+	port := cfg.Server.Port
 	log.Printf("Сервер запущен на порту %s", port)
 	if err := http.ListenAndServe(":"+port, router); err != nil {
 		log.Fatalf("Ошибка запуска HTTP-сервера: %v", err)
