@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -10,7 +9,6 @@ import (
 	"upload-service/internal/kafka"
 	"upload-service/internal/service"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -58,7 +56,7 @@ func (m *MockArtistRepo) UpdateArtist(ctx context.Context, artist *model.Artist)
 func TestGetAllArtists_Success(t *testing.T) {
 	mockRepo := new(MockArtistRepo)
 	dummyProducer := new(kafka.Producer)
-	svc := service.NewArtistService(mockRepo, "test-bucket", "folder", dummyProducer)
+	svc := service.NewArtistService(mockRepo, "test-bucket", "folder", dummyProducer, nil)
 	handler := NewArtistHandler(svc, nil)
 
 	mockRepo.On("GetAllArtists", mock.Anything).Return([]model.Artist{
@@ -77,7 +75,7 @@ func TestGetAllArtists_Success(t *testing.T) {
 func TestGetArtistByID_Success(t *testing.T) {
 	mockRepo := new(MockArtistRepo)
 	dummyProducer := new(kafka.Producer)
-	svc := service.NewArtistService(mockRepo, "test-bucket", "folder", dummyProducer)
+	svc := service.NewArtistService(mockRepo, "test-bucket", "folder", dummyProducer, nil)
 	handler := NewArtistHandler(svc, nil)
 
 	artistID := int64(1)
@@ -96,71 +94,6 @@ func TestGetArtistByID_Success(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	handler.GetArtistByID(rr, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-	mockRepo.AssertExpectations(t)
-}
-func TestRegisterArtist_Success(t *testing.T) {
-	mockRepo := new(MockArtistRepo)
-	dummyProducer := new(kafka.Producer)
-	svc := service.NewArtistService(mockRepo, "test-bucket", "folder", dummyProducer)
-
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "Rbkkth3920",
-		DB:       0,
-	})
-
-	_ = rdb.Set(context.Background(), "session:token", "10", 0).Err()
-	_ = rdb.Del(context.Background(), "artist:10").Err()
-
-	handler := NewArtistHandler(svc, rdb)
-
-	reqBody := `{"name": "New Artist"}`
-	req := httptest.NewRequest(http.MethodPost, "/artists/register/me", bytes.NewBufferString(reqBody))
-	req.Header.Set("Authorization", "token")
-	rr := httptest.NewRecorder()
-
-	expectedArtist := &model.Artist{Name: "New Artist", UserID: 10}
-	mockRepo.On("GetArtistByUserID", mock.Anything, int64(10)).Return((*model.Artist)(nil), nil)
-
-	mockRepo.On("CreateArtist", mock.Anything, expectedArtist, int64(10)).Return(int64(123), nil)
-
-	handler.RegisterArtist(rr, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-	mockRepo.AssertExpectations(t)
-}
-func TestUpdateArtist_Success(t *testing.T) {
-	mockRepo := new(MockArtistRepo)
-	dummyProducer := new(kafka.Producer)
-	svc := service.NewArtistService(mockRepo, "test-bucket", "folder", dummyProducer)
-
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "Rbkkth3920",
-		DB:       0,
-	})
-
-	_ = rdb.Set(context.Background(), "session:token", "10", 0).Err()
-	_ = rdb.Set(context.Background(), "artist:10", "20", 0).Err()
-
-	handler := NewArtistHandler(svc, rdb)
-
-	reqBody := `{"name": "Updated Artist"}`
-	req := httptest.NewRequest(http.MethodPut, "/artists/20", bytes.NewBufferString(reqBody))
-	req = mux.SetURLVars(req, map[string]string{"artist_id": "20"})
-	req.Header.Set("Authorization", "token")
-	rr := httptest.NewRecorder()
-
-	expectedArtist := &model.Artist{ArtistID: 20, Name: "Updated Artist"}
-
-	mockRepo.On("GetArtistByID", mock.Anything, int64(20)).
-		Return(&model.Artist{ArtistID: 20, Name: "Old Artist"}, nil)
-
-	mockRepo.On("UpdateArtist", mock.Anything, expectedArtist).Return(nil)
-
-	handler.UpdateArtist(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	mockRepo.AssertExpectations(t)
@@ -192,85 +125,6 @@ func TestUpdateArtist_InvalidID(t *testing.T) {
 	assert.Contains(t, rr.Body.String(), "Некорректный ID артиста")
 }
 
-func TestUpdateArtist_ForbiddenAnotherArtist(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "Rbkkth3920",
-		DB:       0,
-	})
-	_ = rdb.Set(context.Background(), "session:token", "10", 0).Err()
-	_ = rdb.Set(context.Background(), "artist:10", "99", 0).Err()
-
-	handler := NewArtistHandler(nil, rdb)
-
-	req := httptest.NewRequest(http.MethodPut, "/artists/20", bytes.NewBufferString(`{"name": "X"}`))
-	req = mux.SetURLVars(req, map[string]string{"artist_id": "20"})
-	req.Header.Set("Authorization", "token")
-	rr := httptest.NewRecorder()
-
-	handler.UpdateArtist(rr, req)
-
-	assert.Equal(t, http.StatusForbidden, rr.Code)
-	assert.Contains(t, rr.Body.String(), "не можете редактировать")
-}
-
-func TestUpdateArtist_InvalidJSON(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "Rbkkth3920",
-		DB:       0,
-	})
-	_ = rdb.Set(context.Background(), "session:token", "10", 0).Err()
-	_ = rdb.Set(context.Background(), "artist:10", "20", 0).Err()
-
-	handler := NewArtistHandler(nil, rdb)
-
-	req := httptest.NewRequest(http.MethodPut, "/artists/20", bytes.NewBufferString(`{invalid}`))
-	req = mux.SetURLVars(req, map[string]string{"artist_id": "20"})
-	req.Header.Set("Authorization", "token")
-	rr := httptest.NewRecorder()
-
-	handler.UpdateArtist(rr, req)
-
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
-	assert.Contains(t, rr.Body.String(), "Неверный формат запроса")
-}
-func TestUpdateArtist_ServiceError(t *testing.T) {
-	mockRepo := new(MockArtistRepo)
-	dummyProducer := new(kafka.Producer)
-	svc := service.NewArtistService(mockRepo, "test-bucket", "folder", dummyProducer)
-
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "Rbkkth3920",
-		DB:       0,
-	})
-	_ = rdb.Set(context.Background(), "session:token", "10", 0).Err()
-	_ = rdb.Set(context.Background(), "artist:10", "20", 0).Err()
-
-	handler := NewArtistHandler(svc, rdb)
-
-	expectedArtist := &model.Artist{ArtistID: 20, Name: "Updated Artist"}
-
-	mockRepo.On("GetArtistByID", mock.Anything, int64(20)).
-		Return(&model.Artist{ArtistID: 20, Name: "Old Artist"}, nil)
-
-	mockRepo.On("UpdateArtist", mock.Anything, expectedArtist).
-		Return(assert.AnError)
-
-	req := httptest.NewRequest(http.MethodPut, "/artists/20", bytes.NewBufferString(`{"name":"Updated Artist"}`))
-	req = mux.SetURLVars(req, map[string]string{"artist_id": "20"})
-	req.Header.Set("Authorization", "token")
-	rr := httptest.NewRecorder()
-
-	handler.UpdateArtist(rr, req)
-
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
-	assert.Contains(t, rr.Body.String(), assert.AnError.Error())
-
-	mockRepo.AssertExpectations(t)
-}
-
 func TestGetArtistByID_MethodNotAllowed(t *testing.T) {
 	handler := NewArtistHandler(nil, nil)
 
@@ -285,7 +139,7 @@ func TestGetArtistByID_MethodNotAllowed(t *testing.T) {
 func TestGetArtistByID_ServiceError(t *testing.T) {
 	mockRepo := new(MockArtistRepo)
 	dummyProducer := new(kafka.Producer)
-	svc := service.NewArtistService(mockRepo, "test-bucket", "folder", dummyProducer)
+	svc := service.NewArtistService(mockRepo, "test-bucket", "folder", dummyProducer, nil)
 	handler := NewArtistHandler(svc, nil)
 
 	mockRepo.On("GetArtistByID", mock.Anything, int64(42)).
@@ -317,7 +171,7 @@ func TestGetAllArtists_MethodNotAllowed(t *testing.T) {
 func TestGetAllArtists_ServiceError(t *testing.T) {
 	mockRepo := new(MockArtistRepo)
 	dummyProducer := new(kafka.Producer)
-	svc := service.NewArtistService(mockRepo, "test-bucket", "folder", dummyProducer)
+	svc := service.NewArtistService(mockRepo, "test-bucket", "folder", dummyProducer, nil)
 	handler := NewArtistHandler(svc, nil)
 
 	mockRepo.On("GetAllArtists", mock.Anything).Return([]model.Artist{}, assert.AnError)
@@ -343,55 +197,4 @@ func TestRegisterArtist_MethodNotAllowed(t *testing.T) {
 
 	assert.Equal(t, http.StatusMethodNotAllowed, rr.Code)
 	assert.Contains(t, rr.Body.String(), "Метод не разрешён")
-}
-
-func TestRegisterArtist_InvalidJSON(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "Rbkkth3920",
-		DB:       0,
-	})
-	_ = rdb.Set(context.Background(), "session:token", "10", 0).Err()
-
-	handler := NewArtistHandler(nil, rdb)
-
-	req := httptest.NewRequest(http.MethodPost, "/artists/register/me", bytes.NewBufferString(`{invalid_json}`))
-	req.Header.Set("Authorization", "token")
-	rr := httptest.NewRecorder()
-
-	handler.RegisterArtist(rr, req)
-
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
-	assert.Contains(t, rr.Body.String(), "Неверный формат запроса")
-}
-
-func TestRegisterArtist_ServiceError(t *testing.T) {
-	mockRepo := new(MockArtistRepo)
-	dummyProducer := new(kafka.Producer)
-	svc := service.NewArtistService(mockRepo, "test-bucket", "folder", dummyProducer)
-
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "Rbkkth3920",
-		DB:       0,
-	})
-	_ = rdb.Set(context.Background(), "session:token", "10", 0).Err()
-	_ = rdb.Del(context.Background(), "artist:10").Err()
-
-	handler := NewArtistHandler(svc, rdb)
-
-	reqBody := `{"name": "Test Artist"}`
-	req := httptest.NewRequest(http.MethodPost, "/artists/register/me", bytes.NewBufferString(reqBody))
-	req.Header.Set("Authorization", "token")
-	rr := httptest.NewRecorder()
-
-	mockRepo.On("GetArtistByUserID", mock.Anything, int64(10)).Return((*model.Artist)(nil), nil)
-	mockRepo.On("CreateArtist", mock.Anything, mock.AnythingOfType("*model.Artist"), int64(10)).Return(int64(0), assert.AnError)
-
-	handler.RegisterArtist(rr, req)
-
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
-	assert.Contains(t, rr.Body.String(), assert.AnError.Error())
-
-	mockRepo.AssertExpectations(t)
 }

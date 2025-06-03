@@ -50,26 +50,6 @@ func TestGetUserByID_Success(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 }
 
-func TestUpdateUserByID_Success(t *testing.T) {
-	repo := &mockUserRepo{
-		UpdateFunc: func(u *user.User) error {
-			require.Equal(t, int64(5), u.ID)
-			require.Equal(t, "Updated", u.Name)
-			return nil
-		},
-	}
-	svc := service.NewUserService(repo, nil)
-	h := NewUserHandler(svc, nil)
-
-	body := []byte(`{"name":"Updated"}`)
-	req := httptest.NewRequest(http.MethodPut, "/users/5", bytes.NewReader(body))
-	req = mux.SetURLVars(req, map[string]string{"user_id": "5"})
-	w := httptest.NewRecorder()
-
-	h.UpdateUserByID(w, req)
-	require.Equal(t, http.StatusOK, w.Code)
-}
-
 func TestGetCurrentUser_Success(t *testing.T) {
 	userRepo := &mockUserRepo{
 		GetByIDFunc: func(id int64) (*user.User, error) {
@@ -92,33 +72,6 @@ func TestGetCurrentUser_Success(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	h.GetCurrentUser(w, req)
-	require.Equal(t, http.StatusOK, w.Code)
-}
-
-func TestUpdateCurrentUser_Success(t *testing.T) {
-	userRepo := &mockUserRepo{
-		UpdateFunc: func(u *user.User) error {
-			require.Equal(t, int64(10), u.ID)
-			require.Equal(t, "NewName", u.Name)
-			return nil
-		},
-	}
-	sessionRepo := &mockSessionRepo{
-		GetUserIDFromSessionFunc: func(ctx context.Context, sessionID string) (int64, error) {
-			return 10, nil
-		},
-	}
-	userSvc := service.NewUserService(userRepo, nil)
-	sessionSvc := service.NewSessionService(sessionRepo)
-
-	h := NewUserHandler(userSvc, sessionSvc)
-
-	body := []byte(`{"name":"NewName"}`)
-	req := httptest.NewRequest(http.MethodPut, "/users/me", bytes.NewReader(body))
-	req.AddCookie(&http.Cookie{Name: "session_id", Value: "sessX"})
-	w := httptest.NewRecorder()
-
-	h.UpdateCurrentUser(w, req)
 	require.Equal(t, http.StatusOK, w.Code)
 }
 

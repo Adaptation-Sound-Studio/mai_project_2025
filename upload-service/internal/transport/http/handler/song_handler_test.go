@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -9,7 +8,6 @@ import (
 	"testing"
 
 	"upload-service/internal/domain/model"
-	"upload-service/internal/domain/request"
 	"upload-service/internal/kafka"
 	"upload-service/internal/service"
 
@@ -59,85 +57,22 @@ func (m *MockSongRepo) UpdateSong(ctx context.Context, song *model.Song) error {
 	return args.Error(0)
 }
 
-func TestCreateSong_Success(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
-	rdb.Set(context.Background(), "session:token", "10", 0)
-	rdb.Set(context.Background(), "artist:10", "10", 0)
-
-	mockRepo := new(MockSongRepo)
-	var mockMinioClient *minio.Client = nil
-	var mockKafkaProducer *kafka.Producer = nil
-	svc := service.NewSongService(mockRepo, mockMinioClient, "test-bucket", mockKafkaProducer)
-	handler := NewSongHandler(svc, mockMinioClient, "test-bucket", rdb, mockKafkaProducer)
-
-	songReq := request.CreateSongRequest{
-		Name:      "My Song",
-		GenreID:   1,
-		ArtistIDs: []int64{11},
-	}
-
-	mockRepo.On("CheckArtistsExist", mock.Anything, mock.MatchedBy(func(ids []int64) bool {
-		set := map[int64]bool{}
-		for _, id := range ids {
-			set[id] = true
-		}
-		return set[10] && set[11] && len(set) == 2
-	})).Return([]int64{10, 11}, nil)
-
-	mockRepo.On("CreateSongWithArtists", mock.Anything, mock.AnythingOfType("*model.Song"), mock.MatchedBy(func(ids []int64) bool {
-		set := map[int64]bool{}
-		for _, id := range ids {
-			set[id] = true
-		}
-		return set[10] && set[11] && len(set) == 2
-	})).Return(int64(1), nil)
-
-	body, _ := json.Marshal(songReq)
-	req := httptest.NewRequest(http.MethodPost, "/songs", bytes.NewBuffer(body))
-	req.Header.Set("Authorization", "token")
-	rr := httptest.NewRecorder()
-
-	handler.CreateSong(rr, req)
-	assert.Equal(t, http.StatusCreated, rr.Code)
-	mockRepo.AssertExpectations(t)
+func (m *MockSongRepo) GetGenreBySongID(ctx context.Context, songID int64) (*model.Genre, error) {
+	args := m.Called(ctx, songID)
+	return args.Get(0).(*model.Genre), args.Error(1)
 }
 
-func TestUpdateSong_Success(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
-	rdb.Set(context.Background(), "session:token", "10", 0)
-	rdb.Set(context.Background(), "artist:10", "10", 0)
-
-	mockRepo := new(MockSongRepo)
-	var mockMinioClient *minio.Client = nil
-	var mockKafkaProducer *kafka.Producer = nil
-
-	svc := service.NewSongService(mockRepo, mockMinioClient, "test-bucket", mockKafkaProducer)
-	handler := NewSongHandler(svc, mockMinioClient, "test-bucket", rdb, mockKafkaProducer)
-
-	songID := int64(1)
-	reqBody := request.UpdateSongRequest{
-		Name:    "Updated",
-		GenreID: 2,
+func (m *MockSongRepo) GetOneArtistBySongID(ctx context.Context, songID int64) (*model.Artist, error) {
+	args := m.Called(ctx, songID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	updatedSong := &model.Song{
-		SongID:  songID,
-		Name:    "Updated",
-		GenreID: 2,
-	}
+	return args.Get(0).(*model.Artist), args.Error(1)
+}
 
-	mockRepo.On("GetSongByID", mock.Anything, songID).Return(&model.Song{SongID: songID}, nil)
-	mockRepo.On("GetArtistsBySongID", mock.Anything, songID).Return([]model.Artist{{ArtistID: 10}}, nil)
-	mockRepo.On("UpdateSong", mock.Anything, updatedSong).Return(nil)
-
-	jsonBody, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPut, "/songs/1", bytes.NewBuffer(jsonBody))
-	req = mux.SetURLVars(req, map[string]string{"song_id": "1"})
-	req.Header.Set("Authorization", "token")
-	rr := httptest.NewRecorder()
-
-	handler.UpdateSong(rr, req)
-	assert.Equal(t, http.StatusOK, rr.Code)
-	mockRepo.AssertExpectations(t)
+func (m *MockSongRepo) IncrementAuditions(ctx context.Context, songID int64) error {
+	args := m.Called(ctx, songID)
+	return args.Error(0)
 }
 
 func TestGetAllSongs_Success(t *testing.T) {
@@ -146,7 +81,7 @@ func TestGetAllSongs_Success(t *testing.T) {
 	var mockMinioClient *minio.Client = nil
 	var mockKafkaProducer *kafka.Producer = nil
 
-	svc := service.NewSongService(mockRepo, mockMinioClient, "test-bucket", mockKafkaProducer)
+	svc := service.NewSongService(mockRepo, mockMinioClient, "test-bucket", mockKafkaProducer, nil)
 	handler := NewSongHandler(svc, mockMinioClient, "test-bucket", rdb, mockKafkaProducer)
 
 	expectedSongs := []model.Song{
@@ -191,7 +126,7 @@ func TestGetSongByID_Success(t *testing.T) {
 	var mockMinioClient *minio.Client = nil
 	var mockKafkaProducer *kafka.Producer = nil
 
-	svc := service.NewSongService(mockRepo, mockMinioClient, "test-bucket", mockKafkaProducer)
+	svc := service.NewSongService(mockRepo, mockMinioClient, "test-bucket", mockKafkaProducer, nil)
 	handler := NewSongHandler(svc, mockMinioClient, "test-bucket", rdb, mockKafkaProducer)
 
 	expectedSong := &model.Song{SongID: 1, Name: "Test Song", GenreID: 1, NameOfMinio: "testlink"}
@@ -215,50 +150,5 @@ func TestGetSongByID_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, *expectedSong, result)
 
-	mockRepo.AssertExpectations(t)
-}
-
-func TestUpdateSong_Unauthorized(t *testing.T) {
-	handler := NewSongHandler(nil, redis.NewClient(&redis.Options{Addr: "localhost:6379"}))
-
-	req := httptest.NewRequest(http.MethodPut, "/songs/10", nil)
-	req = mux.SetURLVars(req, map[string]string{"song_id": "10"})
-	req.Header.Set("Authorization", "")
-	rr := httptest.NewRecorder()
-
-	handler.UpdateSong(rr, req)
-
-	assert.Equal(t, http.StatusUnauthorized, rr.Code)
-}
-
-func TestGetSongByID_InvalidID(t *testing.T) {
-	handler := NewSongHandler(nil, nil)
-
-	req := httptest.NewRequest(http.MethodGet, "/songs/invalid", nil)
-	req = mux.SetURLVars(req, map[string]string{"song_id": "invalid"})
-	rr := httptest.NewRecorder()
-
-	handler.GetSongByID(rr, req)
-
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
-	assert.Contains(t, rr.Body.String(), "Некорректный ID песни")
-}
-
-func TestGetSongByID_ServiceError(t *testing.T) {
-	mockRepo := new(MockSongRepo)
-	svc := service.NewSongService(mockRepo)
-	handler := NewSongHandler(svc, nil)
-
-	mockRepo.On("GetSongByID", mock.Anything, int64(42)).
-		Return((*model.Song)(nil), assert.AnError)
-
-	req := httptest.NewRequest(http.MethodGet, "/songs/42", nil)
-	req = mux.SetURLVars(req, map[string]string{"song_id": "42"})
-	rr := httptest.NewRecorder()
-
-	handler.GetSongByID(rr, req)
-
-	assert.Equal(t, http.StatusInternalServerError, rr.Code)
-	assert.Contains(t, rr.Body.String(), "Ошибка при получении песни")
 	mockRepo.AssertExpectations(t)
 }

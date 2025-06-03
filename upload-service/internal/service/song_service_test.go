@@ -82,6 +82,11 @@ func (m *MockSongRepo) GetOneArtistBySongID(ctx context.Context, songID int64) (
 	return args.Get(0).(*model.Artist), args.Error(1)
 }
 
+func (m *MockSongRepo) IncrementAuditions(ctx context.Context, songID int64) error {
+	args := m.Called(ctx, songID)
+	return args.Error(0)
+}
+
 type MockMinioClient struct {
 	mock.Mock
 }
