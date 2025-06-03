@@ -88,12 +88,6 @@ func (s *AlbumService) CreateAlbum(ctx context.Context, album *model.Album, song
 		}
 	}()
 
-	album.Auditions = 0
-	albumID, err := s.repo.CreateAlbum(ctx, tx, album)
-	if err != nil {
-		return 0, err
-	}
-
 	existingSongIDs, err := s.repo.CheckSongsExist(ctx, tx, songIDs)
 	if err != nil {
 		return 0, err
@@ -104,14 +98,20 @@ func (s *AlbumService) CreateAlbum(ctx context.Context, album *model.Album, song
 		return 0, err
 	}
 
+	missing := findMissingAlbumSongIDs(songIDs, existingSongIDs)
+	if len(missing) > 0 {
+		return 0, fmt.Errorf("песни с ID %v не существуют", missing)
+	}
+
 	notOwned := findMissingAlbumSongIDs(songIDs, ownedSongIDs)
 	if len(notOwned) > 0 {
 		return 0, fmt.Errorf("вы не можете добавить чужие песни: %v", notOwned)
 	}
 
-	missing := findMissingAlbumSongIDs(songIDs, existingSongIDs)
-	if len(missing) > 0 {
-		return 0, fmt.Errorf("песни с ID %v не существуют", missing)
+	album.Auditions = 0
+	albumID, err := s.repo.CreateAlbum(ctx, tx, album)
+	if err != nil {
+		return 0, err
 	}
 
 	if len(songIDs) > 0 {

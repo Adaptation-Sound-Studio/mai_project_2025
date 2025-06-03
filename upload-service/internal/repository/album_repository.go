@@ -115,7 +115,13 @@ func (r *albumRepository) GetSongsByAlbumID(ctx context.Context, albumID int64) 
 }
 
 func (r *albumRepository) CheckSongsExist(ctx context.Context, tx *sql.Tx, songIDs []int64) ([]int64, error) {
-	query := "SELECT song_id FROM songs WHERE song_id = ANY($1)"
+
+	if len(songIDs) == 0 {
+		return nil, nil
+	}
+
+	query := "SELECT song_id FROM songs WHERE song_id = ANY($1::bigint[])"
+
 	rows, err := tx.QueryContext(ctx, query, pq.Array(songIDs))
 	if err != nil {
 		return nil, err
@@ -141,7 +147,7 @@ func (r *albumRepository) CheckSongsBelongToArtist(ctx context.Context, tx *sql.
 	query := `
 		SELECT song_id
 		FROM song_artist
-		WHERE artist_id = $1 AND song_id = ANY($2)
+		WHERE artist_id = $1 AND song_id = ANY($2::bigint[])
 	`
 	rows, err := tx.QueryContext(ctx, query, artistID, pq.Array(songIDs))
 	if err != nil {
