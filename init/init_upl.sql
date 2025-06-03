@@ -48,42 +48,20 @@ CREATE TABLE IF NOT EXISTS song_artist (
     UNIQUE (song_id, artist_id)
 );
 
-TRUNCATE TABLE 
-  song_album,
-  song_artist,
-  albums,
-  songs,
-  artists,
-  genres
-RESTART IDENTITY CASCADE;
-
-INSERT INTO genres (name) VALUES 
-  ('Pop'),
-  ('Rock'),
-  ('Jazz')
-ON CONFLICT DO NOTHING;
+INSERT INTO genres (name) VALUES ('Pop'), ('Rock'), ('Jazz') ON CONFLICT DO NOTHING;
 
 INSERT INTO artists (name, user_id) VALUES 
-  ('Artist One', 11),
-  ('Artist Two', 22)
-ON CONFLICT DO NOTHING;
+  ('Artist One', 1),
+  ('Artist Two', 2);
 
 INSERT INTO songs (name, name_on_minio, auditions, genre_id) VALUES 
-  ('Song A', 'Song A_1', 1000, 1),
-  ('Song B', 'Song B_1', 2000, 2)
-ON CONFLICT DO NOTHING;
+  ('Song A', 'Song_A_1', 1000, 1),
+  ('Song B', 'Song_B_1', 2000, 2);
 
 INSERT INTO albums (name, auditions, artist_id, genre_id) VALUES 
   ('Album X', 5000, 1, 1),
-  ('Album Y', 3000, 2, 2)
-ON CONFLICT DO NOTHING;
+  ('Album Y', 3000, 2, 2);
 
-INSERT INTO song_album (song_id, album_id) VALUES 
-  (1, 1),
-  (2, 2)
-ON CONFLICT DO NOTHING;
+INSERT INTO song_album (song_id, album_id) VALUES (1, 1), (2, 2);
 
-INSERT INTO song_artist (song_id, artist_id) VALUES 
-  (1, 1),
-  (2, 2)
-ON CONFLICT DO NOTHING;
+INSERT INTO song_artist (song_id, artist_id) VALUES (1, 1), (2, 2);

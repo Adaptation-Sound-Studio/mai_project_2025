@@ -32,9 +32,9 @@ func BuildRouter(dbConn *sql.DB, redisClient *redis.Client, cfg *config.Config) 
 	userHandler := handler.NewUserHandler(userService, sessionService)
 	log.Println("INFO: HTTP обработчики (AuthHandler, UserHandler) инициализированы")
 
-	mux_router := router.NewRouter()
+	muxRouter := router.NewRouter()
 
-	router.RegisterAuthRoutes(mux_router, authHandler)
+	router.RegisterAuthRoutes(muxRouter, authHandler)
 
 	authMiddleware := middleware.AuthMiddleware(sessionService)
 	roleMiddleware := func(allowedRoles ...string) func(http.Handler) http.Handler {
@@ -44,8 +44,8 @@ func BuildRouter(dbConn *sql.DB, redisClient *redis.Client, cfg *config.Config) 
 	apiKey := cfg.ServiceApiKey
 	apiKeyMiddleware := middleware.ApiKeyMiddleware(apiKey)
 
-	router.RegisterUserRoutes(mux_router, userHandler, authMiddleware, roleMiddleware, apiKeyMiddleware)
+	router.RegisterUserRoutes(muxRouter, userHandler, authMiddleware, roleMiddleware, apiKeyMiddleware)
 	log.Println("INFO: Маршруты успешно зарегистрированы")
 
-	return mux_router, nil
+	return muxRouter, nil
 }

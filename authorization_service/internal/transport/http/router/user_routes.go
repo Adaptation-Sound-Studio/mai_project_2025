@@ -13,7 +13,7 @@ func RegisterUserRoutes(r *mux.Router, h *handler.UserHandler, sessionMiddleware
 	r.Handle("/users/me", sessionMiddleware(http.HandlerFunc(h.UpdateCurrentUser))).Methods("POST")
 	r.Handle("/users/{user_id}", sessionMiddleware(roleMiddleware("admin")(http.HandlerFunc(h.GetUserByID)))).Methods("GET")
 	r.Handle("/users/{user_id}", sessionMiddleware(roleMiddleware("admin")(http.HandlerFunc(h.UpdateUserByID)))).Methods("POST")
-	r.Handle("/users/{user_id}", sessionMiddleware(roleMiddleware("admin")(http.HandlerFunc(h.SoftDeleteUserByID)))).Methods("DELETE")
+	r.Handle("/users/{user_id}", sessionMiddleware(http.HandlerFunc(h.SoftDeleteUserByID))).Methods("DELETE")
 
 	r.HandleFunc("/users", h.CreateUser).Methods("POST")
 }
