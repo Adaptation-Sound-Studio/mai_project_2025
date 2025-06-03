@@ -38,7 +38,7 @@ func main() {
 	consumer := kafka.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.Topic, FactService, ArtistService, SongService, GenreService)
 	go consumer.Start(context.Background())
 
-	router := http.NewRouter(dbConn, cfg.Admin.Secret)
+	router := http.NewRouter(dbConn, cfg.Admin.Secret, cfg.ServiceApiKey)
 
 	port := cfg.Server.Port
 	log.Printf("Сервер запущен на порту %s", port)
