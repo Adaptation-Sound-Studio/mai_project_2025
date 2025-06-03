@@ -54,7 +54,7 @@ func TestArtistRepo_Create_NameTooLong(t *testing.T) {
 	t.Logf("got expected error: %v", err)
 }
 
-func TestGetTopArtistsForUser(t *testing.T) {
+func TestGetTopArtistsForUser_Repo(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
@@ -86,7 +86,7 @@ func TestGetTopArtistsForUser(t *testing.T) {
 	}
 }
 
-func TestGetMostPopularArtists(t *testing.T) {
+func TestGetMostPopularArtists_Repo(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}

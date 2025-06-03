@@ -2,11 +2,11 @@ package repository
 
 import (
 	"database/sql"
+	"flag"
 	"fmt"
 	"log"
 	"os"
 	"testing"
-	"upload-service/internal/testutils"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -15,7 +15,7 @@ import (
 var testDB *sql.DB
 
 func TestMain(m *testing.M) {
-
+	flag.Parse()
 	err := godotenv.Load("C:/Users/User/Desktop/Project/mai_project_2025/.env")
 	if err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
@@ -25,8 +25,8 @@ func TestMain(m *testing.M) {
 	}
 	user := os.Getenv("DB_USER")
 	password := os.Getenv("DB_PASSWORD")
-	connStr := fmt.Sprintf("host=localhost port=5433 user=%s password=%s dbname=anal_db sslmode=disable", user, password)
-	testutils.TestDB, err = sql.Open("postgres", connStr)
+	connStr := fmt.Sprintf("host=localhost port=5434 user=%s password=%s dbname=upl_db sslmode=disable", user, password)
+	testDB, err = sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatalf("Ошибка открытия соединения с БД: %v", err)
 	}

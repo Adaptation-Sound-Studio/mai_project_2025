@@ -31,7 +31,7 @@ func (m *MockArtistRepo) GetMostPopularArtists(limit int) ([]artist.Artist, erro
 	}
 	return nil, args.Error(1)
 }
-func TestCreateArtist_Success(t *testing.T) {
+func TestCreateArtist_Success_Service(t *testing.T) {
 	mockRepo := new(MockArtistRepo)
 	s := NewArtistService(mockRepo)
 
@@ -45,7 +45,7 @@ func TestCreateArtist_Success(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
-func TestCreateArtist_Failure(t *testing.T) {
+func TestCreateArtist_Failure_Service(t *testing.T) {
 	mockRepo := new(MockArtistRepo)
 	s := NewArtistService(mockRepo)
 

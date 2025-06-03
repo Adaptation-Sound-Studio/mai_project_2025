@@ -83,7 +83,7 @@ func TestSongRepo_GetPopularSongs(t *testing.T) {
 	}
 }
 
-func TestFactListens_Insert_InvalidArtistFK(t *testing.T) {
+func TestFactListens_Insert_InvalidArtistFK_Repo(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
@@ -103,7 +103,7 @@ func TestFactListens_Insert_InvalidArtistFK(t *testing.T) {
 	t.Logf("got expected FK error: %v", err)
 }
 
-func TestGetTopSongsForUser(t *testing.T) {
+func TestGetTopSongsForUser_Repo(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
@@ -133,7 +133,7 @@ func TestGetTopSongsForUser(t *testing.T) {
 	}
 }
 
-func TestGetMostPopularSongs(t *testing.T) {
+func TestGetMostPopularSongs_Repo(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}

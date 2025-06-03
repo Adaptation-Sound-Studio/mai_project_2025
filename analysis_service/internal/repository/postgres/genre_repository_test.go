@@ -54,7 +54,7 @@ func TestGenreRepo_Create_DuplicateName(t *testing.T) {
 	t.Logf("got expected error on duplicate insert: %v", err)
 }
 
-func TestGetTopGenresForUser(t *testing.T) {
+func TestGetTopGenresForUser_Repo(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
