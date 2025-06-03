@@ -5,17 +5,24 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/require"
 )
 
 func setupTestRedis() session.SessionRepository {
+	err := godotenv.Load("C:/Users/User/Desktop/Project/mai_project_2025/.env")
+	if err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
 	client := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
-		Password: "Rbkkth3920",
+		Password: os.Getenv("REDIS_PASSWORD"),
 	})
 	return NewSessionRepository(client)
 }
@@ -90,7 +97,11 @@ func TestUpdateSessionField_SessionNotFound(t *testing.T) {
 }
 
 func TestGetSessionField_Success(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379", Password: "Rbkkth3920"})
+	err := godotenv.Load("C:/Users/User/Desktop/Project/mai_project_2025/.env")
+	if err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
+	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379", Password: os.Getenv("REDIS_PASSWORD")})
 	repo := NewSessionRepository(rdb)
 
 	ctx := context.Background()
@@ -100,7 +111,7 @@ func TestGetSessionField_Success(t *testing.T) {
 		"role":    "admin",
 	}
 	jsonData, _ := json.Marshal(data)
-	err := rdb.Set(ctx, sessionID, jsonData, time.Minute).Err()
+	err = rdb.Set(ctx, sessionID, jsonData, time.Minute).Err()
 	require.NoError(t, err)
 
 	val, err := repo.GetSessionField(ctx, sessionID, "user_id")
@@ -109,7 +120,8 @@ func TestGetSessionField_Success(t *testing.T) {
 }
 
 func TestGetSessionField_FieldNotFound(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379", Password: "Rbkkth3920"})
+	err := godotenv.Load("C:/Users/User/Desktop/Project/mai_project_2025/.env")
+	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379", Password: os.Getenv("REDIS_PASSWORD")})
 	repo := NewSessionRepository(rdb)
 
 	ctx := context.Background()
@@ -118,7 +130,7 @@ func TestGetSessionField_FieldNotFound(t *testing.T) {
 		"only_this": "value",
 	}
 	jsonData, _ := json.Marshal(data)
-	err := rdb.Set(ctx, sessionID, jsonData, time.Minute).Err()
+	err = rdb.Set(ctx, sessionID, jsonData, time.Minute).Err()
 	require.NoError(t, err)
 
 	val, err := repo.GetSessionField(ctx, sessionID, "missing")
@@ -128,12 +140,13 @@ func TestGetSessionField_FieldNotFound(t *testing.T) {
 }
 
 func TestGetSessionField_InvalidJSON(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379", Password: "Rbkkth3920"})
+	err := godotenv.Load("C:/Users/User/Desktop/Project/mai_project_2025/.env")
+	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379", Password: os.Getenv("REDIS_PASSWORD")})
 	repo := NewSessionRepository(rdb)
 
 	ctx := context.Background()
 	sessionID := "test-session-invalid-json"
-	err := rdb.Set(ctx, sessionID, "not-a-json", time.Minute).Err()
+	err = rdb.Set(ctx, sessionID, "not-a-json", time.Minute).Err()
 	require.NoError(t, err)
 
 	val, err := repo.GetSessionField(ctx, sessionID, "some")
@@ -153,8 +166,9 @@ func TestGetSessionField_RedisError(t *testing.T) {
 }
 
 func TestDeleteSessionsByUserID_Success(t *testing.T) {
+	err := godotenv.Load("C:/Users/User/Desktop/Project/mai_project_2025/.env")
 	ctx := context.Background()
-	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379", Password: "Rbkkth3920", DB: 0})
+	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379", Password: os.Getenv("REDIS_PASSWORD"), DB: 0})
 	repo := NewSessionRepository(rdb)
 
 	userID := int64(101)
@@ -165,7 +179,7 @@ func TestDeleteSessionsByUserID_Success(t *testing.T) {
 		err := rdb.Set(ctx, "session:"+sid, `{"user_id":101}`, time.Minute).Err()
 		require.NoError(t, err)
 	}
-	err := rdb.SAdd(ctx, userSessionsKey, sessionIDs).Err()
+	err = rdb.SAdd(ctx, userSessionsKey, sessionIDs).Err()
 	require.NoError(t, err)
 
 	err = repo.DeleteSessionsByUserID(ctx, userID)
@@ -180,8 +194,9 @@ func TestDeleteSessionsByUserID_Success(t *testing.T) {
 }
 
 func TestDeleteSessionsByUserID_NoSessions(t *testing.T) {
+	err := godotenv.Load("C:/Users/User/Desktop/Project/mai_project_2025/.env")
 	ctx := context.Background()
-	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379", Password: "Rbkkth3920", DB: 0})
+	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379", Password: os.Getenv("REDIS_PASSWORD"), DB: 0})
 	repo := NewSessionRepository(rdb)
 
 	userID := int64(202)
@@ -189,6 +204,6 @@ func TestDeleteSessionsByUserID_NoSessions(t *testing.T) {
 
 	rdb.Del(ctx, userSessionsKey)
 
-	err := repo.DeleteSessionsByUserID(ctx, userID)
+	err = repo.DeleteSessionsByUserID(ctx, userID)
 	require.NoError(t, err)
 }

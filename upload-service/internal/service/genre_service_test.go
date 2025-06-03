@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"upload-service/internal/config"
@@ -185,8 +186,8 @@ func TestSearchGenres_Integration(t *testing.T) {
 	}
 	cfg := &config.ElasticConfig{
 		URL:      "http://localhost:9200",
-		Username: "elastic",
-		Password: "your_password",
+		Username: os.Getenv("ELASTIC_USER"),
+		Password: os.Getenv("ELASTIC_PASS"),
 	}
 
 	esClient, err := elastic.NewElasticClient(cfg)
@@ -225,8 +226,8 @@ func TestSearchGenres_Success(t *testing.T) {
 	}
 	cfg := &config.ElasticConfig{
 		URL:      "http://localhost:9200",
-		Username: "elastic",
-		Password: "your_password",
+		Username: os.Getenv("ELASTIC_USER"),
+		Password: os.Getenv("ELASTIC_PASS"),
 	}
 
 	esClient, err := elastic.NewElasticClient(cfg)
@@ -264,8 +265,8 @@ func TestSearchGenres_Success(t *testing.T) {
 func TestIndexGenre_Integration(t *testing.T) {
 	cfg := &config.ElasticConfig{
 		URL:      "http://localhost:9200",
-		Username: "elastic",
-		Password: "your_password",
+		Username: os.Getenv("ELASTIC_USER"),
+		Password: os.Getenv("ELASTIC_PASS"),
 	}
 	esClient, err := elastic.NewElasticClient(cfg)
 	require.NoError(t, err)

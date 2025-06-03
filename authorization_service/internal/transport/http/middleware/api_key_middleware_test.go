@@ -10,7 +10,7 @@ import (
 )
 
 func TestApiKeyMiddleware_ValidKey(t *testing.T) {
-	expectedKey := "secret123"
+	expectedKey := "asdfg"
 
 	handlerCalled := false
 
@@ -32,7 +32,7 @@ func TestApiKeyMiddleware_ValidKey(t *testing.T) {
 }
 
 func TestApiKeyMiddleware_InvalidKey(t *testing.T) {
-	expectedKey := "secret123"
+	expectedKey := "qwerty"
 
 	handler := ApiKeyMiddleware(expectedKey)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("handler should not be called with invalid key")
@@ -49,7 +49,7 @@ func TestApiKeyMiddleware_InvalidKey(t *testing.T) {
 }
 
 func TestApiKeyMiddleware_MissingKey(t *testing.T) {
-	expectedKey := "secret123"
+	expectedKey := "zxcv"
 
 	handler := ApiKeyMiddleware(expectedKey)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("handler should not be called when key is missing")

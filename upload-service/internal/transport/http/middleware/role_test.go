@@ -4,24 +4,27 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"upload-service/internal/config"
 	appredis "upload-service/internal/infrastructure/redis"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/require"
 )
 
 func SetupTestRedis(t *testing.T) *redis.Client {
+	err := godotenv.Load("C:/Users/User/Desktop/Project/mai_project_2025/.env")
 	ctx := context.Background()
 	cfg := &config.RedisConfig{
 		Host:     "localhost",
 		Port:     "6379",
-		Password: "Rbkkth3920",
+		Password: os.Getenv("REDIS_PASSWORD"),
 	}
 	client := appredis.NewRedisClient(cfg)
 
-	err := client.Ping(ctx).Err()
+	err = client.Ping(ctx).Err()
 	require.NoError(t, err, "Redis должен быть запущен локально на 6379")
 
 	err = client.FlushAll(ctx).Err()

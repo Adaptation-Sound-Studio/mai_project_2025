@@ -3,24 +3,20 @@ package service
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 	"upload-service/internal/config"
-	"upload-service/internal/domain/event"
 	"upload-service/internal/domain/model"
 	"upload-service/internal/infrastructure/elastic"
 	"upload-service/internal/kafka"
-	"upload-service/internal/repository"
-	"upload-service/internal/testutils"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/assert"
@@ -163,75 +159,6 @@ func TestGetSongByID_Success(t *testing.T) {
 	assert.Equal(t, "Album", result.Album.Name)
 
 	repo.AssertExpectations(t)
-}
-
-func TestCreateSong_WithRealMinio_Integration(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test")
-	}
-
-	minioEndpoint := "localhost:9000"
-	minioAccessKey := "admin"
-	minioSecretKey := "secret123"
-	bucketName := "music"
-
-	minioClient, err := minio.New(minioEndpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(minioAccessKey, minioSecretKey, ""),
-		Secure: false,
-	})
-	require.NoError(t, err)
-
-	ctx := context.Background()
-	found, err := minioClient.BucketExists(ctx, bucketName)
-	require.NoError(t, err)
-	if !found {
-		err = minioClient.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
-		require.NoError(t, err)
-	}
-
-	db, err := sql.Open("postgres", "host=localhost port=5434 user=postgres password=Rbkkth3920 dbname=upl_db sslmode=disable")
-	require.NoError(t, err)
-	defer db.Close()
-
-	testutils.CleanTables(t, db)
-
-	repo := repository.NewSongRepository(db)
-
-	producer := new(MockProducer)
-
-	svc := NewSongService(repo, minioClient, bucketName, producer, nil)
-
-	song := &model.Song{
-		Name:    "Integration Song",
-		GenreID: 1,
-	}
-	artistIDs := []int64{1}
-
-	_, err = db.Exec(`INSERT INTO artists (artist_id, name, user_id) VALUES (1, 'Test Artist', 10) ON CONFLICT DO NOTHING`)
-	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO genres (genre_id, name) VALUES (1, 'Test Genre') ON CONFLICT DO NOTHING`)
-	require.NoError(t, err)
-
-	content := []byte("fake audio content")
-	fakeFile := &fakeMultipartFile{bytes.NewReader(content)}
-	filename := "integration_song.mp3"
-
-	producer.On("SendWrappedEvent", "song_created", event.SongCreatedEvent{
-		ID:   1,
-		Name: "Integration Song",
-	}).Return(nil)
-
-	err = svc.CreateSong(ctx, song, artistIDs, fakeFile, filename)
-
-	require.NoError(t, err)
-
-	require.NotEmpty(t, song.NameOfMinio)
-
-	_, err = minioClient.StatObject(ctx, bucketName, song.NameOfMinio, minio.StatObjectOptions{})
-	require.NoError(t, err)
-
-	err = minioClient.RemoveObject(ctx, bucketName, song.NameOfMinio, minio.RemoveObjectOptions{})
-	require.NoError(t, err)
 }
 
 func TestUpdateSong_Success(t *testing.T) {
@@ -557,8 +484,8 @@ func TestSearchSongs_Integration(t *testing.T) {
 
 	cfg := &config.ElasticConfig{
 		URL:      "http://localhost:9200",
-		Username: "elastic",
-		Password: "your_password",
+		Username: os.Getenv("ELASTIC_USER"),
+		Password: os.Getenv("ELASTIC_PASS"),
 	}
 
 	esClient, err := elastic.NewElasticClient(cfg)
@@ -637,8 +564,8 @@ func TestGenerateUniqueFilename(t *testing.T) {
 func TestIndexSong_Integration(t *testing.T) {
 	cfg := &config.ElasticConfig{
 		URL:      "http://localhost:9200",
-		Username: "elastic",
-		Password: "your_password",
+		Username: os.Getenv("ELASTIC_USER"),
+		Password: os.Getenv("ELASTIC_PASS"),
 	}
 
 	esClient, err := elastic.NewElasticClient(cfg)

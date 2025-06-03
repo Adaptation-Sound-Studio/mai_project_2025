@@ -3,10 +3,13 @@ package redis
 import (
 	"context"
 	"encoding/json"
+	"log"
+	"os"
 	"strconv"
 	"testing"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -14,14 +17,15 @@ import (
 )
 
 func SetupTestRedis(t *testing.T) *redis.Client {
+	err := godotenv.Load("C:/Users/User/Desktop/Project/mai_project_2025/.env")
 	cfg := &config.RedisConfig{
 		Host:     "localhost",
 		Port:     "6379",
-		Password: "Rbkkth3920",
+		Password: os.Getenv("REDIS_PASSWORD"),
 	}
 	client := NewRedisClient(cfg)
 
-	err := client.Ping(ctx).Err()
+	err = client.Ping(ctx).Err()
 	require.NoError(t, err, "Redis должен быть запущен локально на 6379")
 
 	err = client.FlushAll(ctx).Err()
@@ -106,10 +110,14 @@ func TestGetUserRole_NotFound(t *testing.T) {
 }
 
 func TestGetArtistID_Errors(t *testing.T) {
+	err := godotenv.Load("C:/Users/User/Desktop/Project/mai_project_2025/.env")
+	if err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
 	ctx := context.Background()
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
-		Password: "Rbkkth3920",
+		Password: os.Getenv("REDIS_PASSWORD"),
 		DB:       0,
 	})
 	defer rdb.Close()
@@ -141,10 +149,14 @@ func TestGetArtistID_Errors(t *testing.T) {
 }
 
 func TestSetArtistID_Errors(t *testing.T) {
+	err := godotenv.Load("C:/Users/User/Desktop/Project/mai_project_2025/.env")
+	if err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
 	ctx := context.Background()
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
-		Password: "Rbkkth3920",
+		Password: os.Getenv("REDIS_PASSWORD"),
 		DB:       0,
 	})
 	defer rdb.Close()

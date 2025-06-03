@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -247,8 +248,8 @@ func TestGetArtistByID_ArtistNotFound(t *testing.T) {
 func TestSearchArtists_Integration(t *testing.T) {
 	cfg := &config.ElasticConfig{
 		URL:      "http://localhost:9200",
-		Username: "elastic",
-		Password: "your_password",
+		Username: os.Getenv("ELASTIC_USER"),
+		Password: os.Getenv("ELASTIC_PASS"),
 	}
 
 	esClient, err := elastic.NewElasticClient(cfg)
@@ -342,8 +343,8 @@ func TestGetArtistIDByUserID(t *testing.T) {
 func TestIndexArtist_Integration(t *testing.T) {
 	cfg := &config.ElasticConfig{
 		URL:      "http://localhost:9200",
-		Username: "elastic",
-		Password: "your_password",
+		Username: os.Getenv("ELASTIC_USER"),
+		Password: os.Getenv("ELASTIC_PASS"),
 	}
 
 	esClient, err := elastic.NewElasticClient(cfg)

@@ -2,11 +2,14 @@ package postgres
 
 import (
 	"auth_service/internal/domain/user"
+	"auth_service/internal/testutils"
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"testing"
 
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 )
@@ -14,8 +17,18 @@ import (
 var testDB *sql.DB
 
 func TestMain(m *testing.M) {
-	var err error
-	testDB, err = sql.Open("postgres", "host=localhost port=5432 user=postgres password=Rbkkth3920 dbname=auth_db sslmode=disable")
+	err := godotenv.Load("C:/Users/User/Desktop/Project/mai_project_2025/.env")
+	if err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
+	if testing.Short() {
+		os.Exit(m.Run())
+	}
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	connStr := fmt.Sprintf("host=localhost port=5433 user=%s password=%s dbname=anal_db sslmode=disable", user, password)
+
+	testutils.TestDB, err = sql.Open("postgres", connStr)
 	if err != nil {
 		panic(err)
 	}
